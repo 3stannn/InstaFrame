@@ -1,0 +1,200 @@
+{
+  "iphone-15": {
+    "name": "iPhone 15",
+    "canvasWidth": 4500,
+    "canvasHeight": 3000,
+    "screenX": 1752,
+    "screenY": 424,
+    "screenWidth": 1010,
+    "screenHeight": 2193,
+    "borderRadius": 105,
+    "frameAsset": "assets/frames/Iphone15.png"
+  },
+  "iphone-16": {
+    "name": "iPhone 15",
+    "canvasWidth": 4500,
+    "canvasHeight": 3000,
+    "screenX": 1752,
+    "screenY": 424,
+    "screenWidth": 1010,
+    "screenHeight": 2193,
+    "borderRadius": 105,
+    "frameAsset": "assets/frames/Iphone15.png"
+  },
+  "iphone-clay-dark": {
+    "name": "iPhone 15",
+    "canvasWidth": 4500,
+    "canvasHeight": 3000,
+    "screenX": 1752,
+    "screenY": 424,
+    "screenWidth": 1010,
+    "screenHeight": 2193,
+    "borderRadius": 105,
+    "frameAsset": "assets/frames/Iphone15.png"
+  },
+  "iphone-clay-light": {
+    "name": "iPhone 15",
+    "canvasWidth": 4500,
+    "canvasHeight": 3000,
+    "screenX": 1752,
+    "screenY": 424,
+    "screenWidth": 1010,
+    "screenHeight": 2193,
+    "borderRadius": 105,
+    "frameAsset": "assets/frames/Iphone15.png"
+  },
+  "macbook-air-13": {
+    "name": "MacBook Air 13\"",
+    "canvasWidth": 7500,
+    "canvasHeight": 5000,
+    "screenX": 2030,
+    "screenY": 1206,
+    "screenWidth": 3443,
+    "screenHeight": 2242,
+    "borderRadius": 40,
+    "frameAsset": "assets/frames/MacbookAir13.png"
+  },
+  "macbook-pro-clay": {
+    "name": "MacBook Air 13\"",
+    "canvasWidth": 7500,
+    "canvasHeight": 5000,
+    "screenX": 2030,
+    "screenY": 1206,
+    "screenWidth": 3443,
+    "screenHeight": 2242,
+    "borderRadius": 40,
+    "frameAsset": "assets/frames/MacbookAir13.png"
+  },
+  "ipad-pro": {
+    "name": "iPad Pro",
+    "canvasWidth": 7500,
+    "canvasHeight": 5000,
+    "screenX": 2320,
+    "screenY": 1428,
+    "screenWidth": 2859,
+    "screenHeight": 2144,
+    "borderRadius": 35,
+    "frameAsset": "assets/frames/IpadPro.png"
+  },
+  "ipad-pro-13": {
+    "name": "iPad Pro",
+    "canvasWidth": 7500,
+    "canvasHeight": 5000,
+    "screenX": 2320,
+    "screenY": 1428,
+    "screenWidth": 2859,
+    "screenHeight": 2144,
+    "borderRadius": 35,
+    "frameAsset": "assets/frames/IpadPro.png"
+  },
+  "ipad-pro-12": {
+    "name": "iPad Pro",
+    "canvasWidth": 7500,
+    "canvasHeight": 5000,
+    "screenX": 2320,
+    "screenY": 1428,
+    "screenWidth": 2859,
+    "screenHeight": 2144,
+    "borderRadius": 35,
+    "frameAsset": "assets/frames/IpadPro.png"
+  },
+  "ipad-pro-11": {
+    "name": "iPad Pro",
+    "canvasWidth": 7500,
+    "canvasHeight": 5000,
+    "screenX": 2320,
+    "screenY": 1428,
+    "screenWidth": 2859,
+    "screenHeight": 2144,
+    "borderRadius": 35,
+    "frameAsset": "assets/frames/IpadPro.png"
+  },
+  "pro-display-xdr": {
+    "name": "Apple Pro Display XDR",
+    "canvasWidth": 9000,
+    "canvasHeight": 5776,
+    "screenX": 1727,
+    "screenY": 1142,
+    "screenWidth": 5545,
+    "screenHeight": 3121,
+    "borderRadius": 4,
+    "frameAsset": "assets/frames/ProDisplayXDR.png"
+  },
+  "apple-pro-display-xdr": {
+    "name": "Apple Pro Display XDR",
+    "canvasWidth": 9000,
+    "canvasHeight": 5776,
+    "screenX": 1727,
+    "screenY": 1142,
+    "screenWidth": 5545,
+    "screenHeight": 3121,
+    "borderRadius": 4,
+    "frameAsset": "assets/frames/ProDisplayXDR.png"
+  },
+  "xdr": {
+    "name": "Apple Pro Display XDR",
+    "canvasWidth": 9000,
+    "canvasHeight": 5776,
+    "screenX": 1727,
+    "screenY": 1142,
+    "screenWidth": 5545,
+    "screenHeight": 3121,
+    "borderRadius": 4,
+    "frameAsset": "assets/frames/ProDisplayXDR.png"
+  },
+  "pixel-8": {
+    "name": "Google Pixel 8",
+    "canvasWidth": 4500,
+    "canvasHeight": 3000,
+    "screenX": 1795,
+    "screenY": 501,
+    "screenWidth": 900,
+    "screenHeight": 1999,
+    "borderRadius": 45,
+    "frameAsset": "assets/frames/Pixel8.png"
+  },
+  "pixel": {
+    "name": "Google Pixel 8",
+    "canvasWidth": 4500,
+    "canvasHeight": 3000,
+    "screenX": 1795,
+    "screenY": 501,
+    "screenWidth": 900,
+    "screenHeight": 1999,
+    "borderRadius": 45,
+    "frameAsset": "assets/frames/Pixel8.png"
+  },
+  "s24": {
+    "name": "Samsung Galaxy S24 Ultra",
+    "canvasWidth": 4500,
+    "canvasHeight": 3000,
+    "screenX": 1744,
+    "screenY": 419,
+    "screenWidth": 1005,
+    "screenHeight": 2163,
+    "borderRadius": 2,
+    "frameAsset": "assets/frames/S24.png"
+  },
+  "samsung-s24-ultra": {
+    "name": "Samsung Galaxy S24 Ultra",
+    "canvasWidth": 4500,
+    "canvasHeight": 3000,
+    "screenX": 1744,
+    "screenY": 419,
+    "screenWidth": 1005,
+    "screenHeight": 2163,
+    "borderRadius": 2,
+    "frameAsset": "assets/frames/S24.png"
+  },
+  "s24-ultra": {
+    "name": "Samsung Galaxy S24 Ultra",
+    "canvasWidth": 4500,
+    "canvasHeight": 3000,
+    "screenX": 1744,
+    "screenY": 419,
+    "screenWidth": 1005,
+    "screenHeight": 2163,
+    "borderRadius": 2,
+    "frameAsset": "assets/frames/S24.png"
+  }
+}

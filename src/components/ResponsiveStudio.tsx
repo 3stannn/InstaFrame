@@ -240,6 +240,7 @@ export function ResponsiveStudio({
           customH: device.height,
           captureFullPage: true,
           captureQuality: "preview",
+          settleDelay: 1000,
         });
 
         if (result.success && result.data) {

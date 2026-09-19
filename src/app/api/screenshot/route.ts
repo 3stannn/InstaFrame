@@ -110,10 +110,16 @@ export async function POST(request: NextRequest) {
       zoomLevel = 100,
       captureFullPage = false,
       captureQuality = "preview",
+      settleDelay = 1000,
     } = body;
 
     const validatedQuality: "preview" | "export" =
       captureQuality === "export" ? "export" : "preview";
+
+    const validatedSettleDelay = Math.max(
+      0,
+      Math.min(5000, parseInt(String(settleDelay ?? 1000), 10) || 1000)
+    );
 
     logger = new CaptureLogger({
       url: String(url || ""),
@@ -465,15 +471,30 @@ export async function POST(request: NextRequest) {
     }
     logger.endStage("navigation");
 
-    // 6. Readiness Stage (Fonts & Visible Images)
+    // 6. Readiness Stage (Fonts, Visible Images, Animations & Settle Delay)
     logger.startStage("readiness");
-    const readinessBudget = Math.min(2500, getRemainingBudget(operationStart) - 8000);
+    const readinessBudget = Math.min(4500, getRemainingBudget(operationStart) - 6000);
 
     try {
       await page.evaluate(async (maxWaitMs: number) => {
         const deadline = Date.now() + maxWaitMs;
 
-        // 1. Wait for document fonts if supported
+        // 1. Wait for document.readyState === "complete" if still loading
+        if (document.readyState !== "complete") {
+          const readyTimeout = Math.min(1500, Math.max(100, deadline - Date.now()));
+          await Promise.race([
+            new Promise<void>((resolve) => {
+              if (document.readyState === "complete") {
+                resolve();
+              } else {
+                window.addEventListener("load", () => resolve(), { once: true });
+              }
+            }),
+            new Promise((r) => setTimeout(r, readyTimeout)),
+          ]).catch(() => {});
+        }
+
+        // 2. Wait for document fonts if supported
         if ("fonts" in document && document.fonts.ready) {
           const fontTimeout = Math.min(800, Math.max(100, deadline - Date.now()));
           await Promise.race([
@@ -482,7 +503,7 @@ export async function POST(request: NextRequest) {
           ]).catch(() => {});
         }
 
-        // 2. Wait for visible images in the initial viewport
+        // 3. Wait for visible images in the initial viewport
         const visibleImages = Array.from(document.querySelectorAll("img")).filter((img) => {
           const rect = img.getBoundingClientRect();
           return rect.top < window.innerHeight && rect.bottom > 0 && img.src;
@@ -502,9 +523,49 @@ export async function POST(request: NextRequest) {
             new Promise((r) => setTimeout(r, imgTimeout)),
           ]).catch(() => {});
         }
+
+        // 4. Wait for running finite CSS / Web Animations to complete
+        if (typeof document.getAnimations === "function") {
+          try {
+            const runningAnimations = document.getAnimations().filter((anim) => {
+              if (anim.playState !== "running") return false;
+              const timing = anim.effect?.getTiming();
+              if (
+                timing &&
+                (timing.iterations === Infinity ||
+                  timing.duration === Infinity ||
+                  timing.iterations === null ||
+                  timing.duration === null)
+              ) {
+                return false;
+              }
+              return true;
+            });
+
+            if (runningAnimations.length > 0) {
+              const animPromises = runningAnimations.map((anim) => anim.finished.catch(() => {}));
+              const animTimeout = Math.min(1500, Math.max(100, deadline - Date.now()));
+              await Promise.race([
+                Promise.all(animPromises),
+                new Promise((r) => setTimeout(r, animTimeout)),
+              ]);
+            }
+          } catch {
+            // Best effort for getAnimations
+          }
+        }
       }, readinessBudget);
     } catch {
       // Best-effort readiness check
+    }
+
+    // 5. Dedicated settle pause for JS-driven animations (Framer Motion, React hydration, Tailwind transitions)
+    if (validatedSettleDelay > 0) {
+      const remainingForPause = getRemainingBudget(operationStart) - 6000;
+      const actualPauseMs = Math.min(validatedSettleDelay, Math.max(0, remainingForPause));
+      if (actualPauseMs > 0) {
+        await new Promise((r) => setTimeout(r, actualPauseMs));
+      }
     }
 
     // Suppress scrollbars to preserve mockup aesthetics

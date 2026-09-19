@@ -15,6 +15,7 @@ export interface CaptureRequestParams {
   zoomLevel?: number;
   captureFullPage?: boolean;
   captureQuality?: "preview" | "export";
+  settleDelay?: number;
   signal?: AbortSignal;
 }
 
@@ -61,6 +62,7 @@ export function getCaptureCacheKey(params: CaptureRequestParams): string {
     params.zoomLevel || 100,
     Boolean(params.captureFullPage),
     params.captureQuality || "preview",
+    params.settleDelay ?? 1000,
   ].join("::");
 }
 
@@ -113,6 +115,7 @@ export async function executeScreenshotCapture(
         zoomLevel: params.zoomLevel,
         captureFullPage: params.captureFullPage,
         captureQuality: params.captureQuality || "preview",
+        settleDelay: params.settleDelay ?? 1000,
       }),
       signal: params.signal,
     });

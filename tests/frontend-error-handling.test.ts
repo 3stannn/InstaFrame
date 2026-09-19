@@ -49,6 +49,14 @@ describe("Frontend Error Handling & Cache", () => {
       captureQuality: "export",
     });
     assert.notEqual(key1, keyExport);
+
+    // Changing settleDelay produces a different key
+    const keyDelay = getCaptureCacheKey({
+      url: "https://example.com",
+      presetKey: "macbook-air-13",
+      settleDelay: 2500,
+    });
+    assert.notEqual(key1, keyDelay);
   });
 
   test("session cache stores and retrieves capture data correctly", () => {

@@ -315,6 +315,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
         zoomLevel: parseInt(zoomToUse, 10) || 100,
         captureFullPage: fullPage,
         captureQuality: "preview",
+        settleDelay: 1000,
         signal: abortController.signal,
       });
 

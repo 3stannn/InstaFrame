@@ -63,19 +63,19 @@ export function LicenseModal({
         onClick={onClose}
       />
 
-      {/* Modal Dialog (Squircle Card) */}
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl shadow-black/80">
-        <div className="flex items-center justify-between pb-4">
+      {/* Modal Dialog */}
+      <div className="relative w-full max-w-md overflow-hidden rounded-md border border-zinc-800 bg-zinc-950 p-5 shadow-xl">
+        <div className="flex items-center justify-between pb-3">
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-semibold text-zinc-100">Studio Pro</h3>
-            <span className="rounded bg-indigo-500/20 px-2 py-0.5 text-[10px] font-semibold text-indigo-300">
+            <h3 className="text-sm font-semibold text-zinc-100">Studio Pro</h3>
+            <span className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-300">
               PRO
             </span>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+            className="rounded p-1 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
           >
             <X className="h-4 w-4" />
           </button>
@@ -85,13 +85,13 @@ export function LicenseModal({
           Unlock realistic Apple hardware frames (Pro Display XDR, MacBook Air 13&quot;, iPad Pro, iPhone 15, Galaxy S24, Pixel 8) with studio backdrops and drop shadows.
         </p>
 
-        <div className="mt-5">
+        <div className="mt-4">
           {isPro ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-3.5">
-                <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-emerald-400" />
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 border-y border-zinc-800 py-3">
+                <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-zinc-100" />
                 <div>
-                  <h4 className="text-xs font-semibold text-emerald-300">Pro License Active</h4>
+                  <h4 className="text-xs font-semibold text-zinc-100">Pro License Active</h4>
                   <p className="text-[11px] font-mono text-zinc-400">{maskedKey}</p>
                 </div>
               </div>
@@ -99,13 +99,13 @@ export function LicenseModal({
               <button
                 type="button"
                 onClick={handleDeactivate}
-                className="w-full rounded-xl border border-rose-900/60 bg-rose-950/30 px-4 py-2 text-xs font-medium text-rose-300 transition-colors hover:bg-rose-900/40"
+                className="w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
               >
                 Deactivate License
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               <div>
                 <label htmlFor="polar-key-input" className="block text-[11px] font-medium text-zinc-400">
                   Polar.sh License Key
@@ -116,7 +116,7 @@ export function LicenseModal({
                   value={keyInput}
                   onChange={(e) => setKeyInput(e.target.value)}
                   placeholder="POLAR_XXXXX-XXXXX..."
-                  className="mt-1.5 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors focus:border-indigo-500/80"
+                  className="mt-1.5 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors focus:border-zinc-500"
                 />
               </div>
 
@@ -124,7 +124,7 @@ export function LicenseModal({
                 type="button"
                 onClick={handleActivate}
                 disabled={loading}
-                className="w-full rounded-xl bg-zinc-100 px-4 py-2.5 text-xs font-semibold text-zinc-900 shadow-sm transition-all hover:bg-white active:scale-[0.99] disabled:opacity-50"
+                className="w-full rounded-md bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-950 transition-colors hover:bg-white disabled:opacity-50"
               >
                 {loading ? "Validating..." : "Activate License"}
               </button>
@@ -134,7 +134,7 @@ export function LicenseModal({
                   href="https://buy.polar.sh/polar_cl_GO2Tqbj7O7zh6FIir82m37Du7ppIdpW101SWF3L8MwZ"
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300"
+                  className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white underline"
                 >
                   <span>Need a license? Get Pro</span>
                   <ExternalLink className="h-3 w-3" />

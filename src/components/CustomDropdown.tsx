@@ -139,9 +139,9 @@ export function CustomDropdown({
         onClick={() => setIsOpen(!isOpen)}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className={`flex h-9 w-full items-center justify-between rounded-xl border px-3 text-xs outline-none transition-all duration-150 ${
+        className={`flex h-8 w-full items-center justify-between rounded-md border px-2.5 text-xs outline-none transition-all duration-150 ${
           isOpen
-            ? "border-zinc-600 bg-zinc-900 shadow-sm"
+            ? "border-zinc-600 bg-zinc-900"
             : "border-zinc-800 bg-zinc-900/90 hover:border-zinc-700 hover:bg-zinc-900"
         } ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
       >
@@ -170,7 +170,7 @@ export function CustomDropdown({
       {isOpen && (
         <div
           role="listbox"
-          className={`absolute top-full z-50 mt-1.5 max-h-72 overflow-y-auto rounded-xl border border-zinc-700/80 bg-zinc-900 p-1.5 shadow-2xl ${
+          className={`absolute top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-md border border-zinc-800 bg-zinc-950 p-1 shadow-lg ${
             align === "right"
               ? "right-0 w-full min-w-[210px]"
               : align === "left"
@@ -204,7 +204,7 @@ export function CustomDropdown({
                         onChange(item.value);
                         setIsOpen(false);
                       }}
-                      className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-all duration-100 ${
+                      className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-all duration-100 ${
                         isSelected
                           ? "bg-white font-semibold text-zinc-900 shadow-sm"
                           : "text-zinc-300 hover:bg-zinc-800/80 hover:text-zinc-100"

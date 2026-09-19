@@ -41,7 +41,7 @@ export function Header({ currentTab, onTabChange, isPro, onOpenLicense }: Header
             onClick={() => onTabChange("responsive")}
             className={`flex items-center gap-1.5 py-1.5 text-xs font-medium transition-all duration-150 border-b-2 ${
               currentTab === "responsive"
-                ? "border-indigo-500 text-zinc-100 font-semibold"
+                ? "border-white text-white font-semibold"
                 : "border-transparent text-zinc-400 hover:text-zinc-200"
             }`}
           >
@@ -53,7 +53,7 @@ export function Header({ currentTab, onTabChange, isPro, onOpenLicense }: Header
             onClick={() => onTabChange("mockup")}
             className={`flex items-center gap-1.5 py-1.5 text-xs font-medium transition-all duration-150 border-b-2 ${
               currentTab === "mockup"
-                ? "border-indigo-500 text-zinc-100 font-semibold"
+                ? "border-white text-white font-semibold"
                 : "border-transparent text-zinc-400 hover:text-zinc-200"
             }`}
           >
@@ -71,14 +71,14 @@ export function Header({ currentTab, onTabChange, isPro, onOpenLicense }: Header
           onClick={onOpenLicense}
           className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-all duration-150 ${
             isPro
-              ? "border-emerald-500/30 bg-emerald-950/30 text-emerald-300 hover:border-emerald-500/50"
+              ? "border-zinc-700 bg-zinc-800 text-zinc-100 hover:border-zinc-600"
               : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100"
           }`}
           title={isPro ? "Pro License Active" : "Upgrade to Pro License"}
         >
           <span
             className={`h-1.5 w-1.5 rounded-full ${
-              isPro ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" : "bg-zinc-500"
+              isPro ? "bg-white" : "bg-zinc-500"
             }`}
           />
           <span>{isPro ? "Pro Active" : "Free Tier"}</span>

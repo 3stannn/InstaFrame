@@ -159,7 +159,7 @@ export function DeviceFrame({
     >
       {/* Visual scaled container with top-left origin */}
       <div
-        className="device-frame-card absolute top-0 left-0 flex flex-col rounded-xl border border-zinc-800/90 bg-zinc-900 shadow-2xl origin-top-left"
+        className="device-frame-card absolute top-0 left-0 flex flex-col rounded-md border border-zinc-800 bg-zinc-950 shadow-md origin-top-left"
         style={{
           width: `${unscaledWidth}px`,
           height: `${unscaledHeight}px`,
@@ -168,17 +168,17 @@ export function DeviceFrame({
         }}
       >
         {/* Frame Toolbar */}
-        <div className="flex h-[36px] items-center justify-between border-b border-zinc-800/90 bg-zinc-900/95 px-3 select-none">
+        <div className="flex h-[34px] items-center justify-between border-b border-zinc-800 bg-zinc-900/90 px-2.5 select-none">
           {/* Left: Device Name, Dimensions Badge, Bridge Status */}
           <div className="flex items-center gap-2 overflow-hidden">
             {/* Loading / Active Status Dot */}
             <span
               className={`h-2 w-2 rounded-full flex-shrink-0 transition-colors ${
                 previewMode === "live" && iframeLoading
-                  ? "bg-amber-400 animate-pulse"
+                  ? "bg-zinc-400 animate-pulse"
                   : previewMode === "preview" && isSnapshotLoading
-                  ? "bg-amber-400 animate-pulse"
-                  : "bg-emerald-400"
+                  ? "bg-zinc-400 animate-pulse"
+                  : "bg-white"
               }`}
               title={
                 previewMode === "live" && iframeLoading
@@ -208,10 +208,10 @@ export function DeviceFrame({
             {/* Mode B: Cooperative Bridge Status Badge */}
             {previewMode === "live" && bridgeConnected && (
               <span
-                className="flex items-center gap-1 rounded bg-indigo-500/20 px-1.5 py-0.5 text-[9.5px] font-medium text-indigo-300 border border-indigo-500/30"
+                className="flex items-center gap-1 rounded bg-zinc-800 px-1.5 py-0.5 text-[9.5px] font-medium text-zinc-200 border border-zinc-700"
                 title={`Bridge Connected: Sync scroll ${bridgeCapabilities?.scroll ? "active" : "disabled"}`}
               >
-                <Wifi className="h-2.5 w-2.5 text-indigo-400 animate-pulse" />
+                <Wifi className="h-2.5 w-2.5 text-white animate-pulse" />
                 <span>Bridge Active</span>
               </span>
             )}
@@ -228,7 +228,7 @@ export function DeviceFrame({
                 }
                 className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[9.5px] font-medium transition-colors ${
                   isProxied
-                    ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/30"
+                    ? "bg-zinc-800 text-zinc-100 border border-zinc-700 hover:bg-zinc-700"
                     : "text-zinc-400 hover:text-zinc-200 bg-zinc-800/80 hover:bg-zinc-800"
                 }`}
               >
@@ -247,7 +247,7 @@ export function DeviceFrame({
               title={`Rotate to ${device.rotated ? "Portrait" : "Landscape"} (${device.height} × ${device.width})`}
               className={`rounded p-1 transition-colors ${
                 device.rotated
-                  ? "bg-indigo-500/20 text-indigo-300"
+                  ? "bg-zinc-800 text-white"
                   : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
               }`}
             >
@@ -277,8 +277,8 @@ export function DeviceFrame({
                 title="Capture Viewport (Send to Mockup Studio or Download PNG)"
                 className={`rounded p-1 transition-colors ${
                   capturePopoverOpen
-                    ? "bg-indigo-500/20 text-indigo-400"
-                    : "text-zinc-400 hover:bg-zinc-800 hover:text-indigo-400"
+                    ? "bg-zinc-800 text-white"
+                    : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
                 }`}
               >
                 <Camera className="h-3 w-3" />
@@ -304,7 +304,7 @@ export function DeviceFrame({
                 type="button"
                 onClick={onOpenBridgeHelp}
                 title="Cooperative Bridge Setup Guide"
-                className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-indigo-400 transition-colors"
+                className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
               >
                 <Wifi className="h-3 w-3" />
               </button>
@@ -325,7 +325,7 @@ export function DeviceFrame({
               type="button"
               onClick={() => onRemove(device.id)}
               title="Close viewport"
-              className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-rose-400 transition-colors"
+              className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors"
             >
               <X className="h-3 w-3" />
             </button>
@@ -334,7 +334,7 @@ export function DeviceFrame({
 
         {/* Inline Dimensions Editor Popover */}
         {editDimensionsOpen && (
-          <div className="absolute top-[38px] left-3 z-30 w-64 rounded-lg border border-zinc-700 bg-zinc-900 p-2.5 shadow-2xl">
+          <div className="absolute top-[36px] left-2.5 z-30 w-60 rounded-md border border-zinc-800 bg-zinc-950 p-2 shadow-lg">
             <form onSubmit={handleApplyDimensions} className="space-y-2">
               <div className="text-[11px] font-semibold text-zinc-200">Custom Dimensions</div>
               <div className="flex items-center gap-2">
@@ -346,7 +346,7 @@ export function DeviceFrame({
                     onChange={(e) => setCustomW(e.target.value)}
                     min={100}
                     max={7680}
-                    className="w-20 rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs text-zinc-100 focus:border-indigo-500 focus:outline-none"
+                    className="w-20 rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs text-zinc-100 focus:border-zinc-400 focus:outline-none"
                   />
                 </div>
                 <span className="text-zinc-500 mt-3.5">×</span>
@@ -358,12 +358,12 @@ export function DeviceFrame({
                     onChange={(e) => setCustomH(e.target.value)}
                     min={100}
                     max={7680}
-                    className="w-20 rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs text-zinc-100 focus:border-indigo-500 focus:outline-none"
+                    className="w-20 rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs text-zinc-100 focus:border-zinc-400 focus:outline-none"
                   />
                 </div>
                 <button
                   type="submit"
-                  className="mt-3.5 flex items-center justify-center rounded bg-indigo-600 p-1.5 text-white hover:bg-indigo-500 transition-colors"
+                  className="mt-3.5 flex items-center justify-center rounded bg-white p-1.5 text-zinc-950 hover:bg-zinc-200 transition-colors font-semibold"
                   title="Apply dimensions"
                 >
                   <Check className="h-3.5 w-3.5" />
@@ -386,9 +386,9 @@ export function DeviceFrame({
             <>
               {/* Mixed Content Warning Banner */}
               {isMixedContent && (
-                <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-200">
+                <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between gap-2 border-b border-zinc-700 bg-zinc-800/95 px-3 py-1.5 text-[11px] text-zinc-200">
                   <div className="flex items-center gap-1.5 truncate">
-                    <AlertCircle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                    <AlertCircle className="h-3.5 w-3.5 text-white shrink-0" />
                     <span className="truncate">
                       Mixed Content: HTTPS viewers cannot load HTTP targets directly.
                     </span>

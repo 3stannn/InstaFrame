@@ -122,16 +122,13 @@ export function CaptureViewportPopover({
       ref={popoverRef}
       role="dialog"
       aria-label="Capture Viewport Options"
-      className="absolute right-0 top-full mt-2 z-50 w-[310px] rounded-xl border border-zinc-700/80 bg-zinc-900 p-3.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 select-none text-zinc-200"
-      style={{
-        boxShadow: "0 14px 40px -4px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08)",
-      }}
+      className="absolute right-0 top-full mt-2 z-50 w-[310px] rounded-md border border-zinc-800 bg-zinc-950 p-3 shadow-lg animate-in fade-in zoom-in-95 duration-150 select-none text-zinc-200"
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2.5 mb-3">
+      <div className="flex items-center justify-between border-b border-zinc-800 pb-2 mb-2.5">
         <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-            <Camera className="h-3.5 w-3.5" />
+          <div className="flex h-5 w-5 items-center justify-center rounded border border-zinc-800 bg-zinc-900 text-zinc-200">
+            <Camera className="h-3 w-3" />
           </div>
           <div>
             <h4 className="text-xs font-semibold text-zinc-100 leading-none">Capture Viewport</h4>
@@ -144,7 +141,7 @@ export function CaptureViewportPopover({
             onClose();
             triggerRef.current?.focus();
           }}
-          className="rounded-md p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+          className="rounded p-1 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 transition-colors"
           aria-label="Close dialog"
         >
           <X className="h-3.5 w-3.5" />
@@ -152,13 +149,13 @@ export function CaptureViewportPopover({
       </div>
 
       {/* Section 1: Capture Area */}
-      <div className="mb-3.5">
-        <label className="text-[10.5px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 block">
+      <div className="mb-3">
+        <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1 block">
           Capture Area
         </label>
-        <div className="flex w-full items-start gap-2.5 rounded-lg border border-indigo-500/50 bg-indigo-500/10 p-2 text-left">
-          <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-indigo-400">
-            <div className="h-2 w-2 rounded-full bg-indigo-400" />
+        <div className="flex w-full items-start gap-2 rounded border border-zinc-800 bg-zinc-900/50 p-2 text-left">
+          <div className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-zinc-400">
+            <div className="h-1.5 w-1.5 rounded-full bg-zinc-200" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-xs font-medium leading-none text-zinc-200">Current visible area</div>
@@ -170,45 +167,45 @@ export function CaptureViewportPopover({
       </div>
 
       {/* Section 2: Output */}
-      <div className="mb-3.5">
-        <label className="text-[10.5px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 block">
+      <div className="mb-3">
+        <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1 block">
           Output
         </label>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-2 gap-1 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
           <button
             data-action="output-mockup-option"
             type="button"
             onClick={() => handleOutputModeChange("mockup")}
-            className={`flex flex-col items-center justify-center gap-1.5 rounded-lg border p-2 text-center transition-all ${
+            className={`flex items-center justify-center gap-1.5 rounded py-1 text-center text-xs font-medium transition-colors ${
               outputMode === "mockup"
-                ? "border-indigo-500/60 bg-indigo-500/15 text-white"
-                : "border-zinc-800 bg-zinc-950/40 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                ? "bg-zinc-800 text-zinc-100 shadow-sm"
+                : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            <Layers className="h-3.5 w-3.5 text-indigo-400" />
-            <span className="text-[11px] font-medium leading-tight">With mockup</span>
+            <Layers className="h-3.5 w-3.5" />
+            <span className="text-[11px] leading-tight">With mockup</span>
           </button>
 
           <button
             data-action="output-clean-option"
             type="button"
             onClick={() => handleOutputModeChange("clean")}
-            className={`flex flex-col items-center justify-center gap-1.5 rounded-lg border p-2 text-center transition-all ${
+            className={`flex items-center justify-center gap-1.5 rounded py-1 text-center text-xs font-medium transition-colors ${
               outputMode === "clean"
-                ? "border-indigo-500/60 bg-indigo-500/15 text-white"
-                : "border-zinc-800 bg-zinc-950/40 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                ? "bg-zinc-800 text-zinc-100 shadow-sm"
+                : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            <Download className="h-3.5 w-3.5 text-zinc-300" />
-            <span className="text-[11px] font-medium leading-tight">Without mockup</span>
+            <Download className="h-3.5 w-3.5" />
+            <span className="text-[11px] leading-tight">Without mockup</span>
           </button>
         </div>
       </div>
 
       {/* Section 3: Device selector (if "With device mockup" is selected) */}
       {outputMode === "mockup" && (
-        <div className="mb-4">
-          <label className="text-[10.5px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 block">
+        <div className="mb-3">
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1 block">
             Target Mockup Frame
           </label>
           <div className="relative">
@@ -220,7 +217,7 @@ export function CaptureViewportPopover({
                 const frame = DEVICE_PRESETS[presetKey]?.defaultFrame || "none";
                 setSelectedFrame(frame);
               }}
-              className="w-full appearance-none rounded-lg border border-zinc-700/80 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-200 transition-colors hover:border-zinc-600 focus:border-indigo-500 focus:outline-none"
+              className="w-full appearance-none rounded border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-200 transition-colors hover:border-zinc-700 focus:border-zinc-500 focus:outline-none"
             >
               <optgroup label="Desktop & Laptops">
                 <option value="macbook-air-13">MacBook Air 13&quot;</option>
@@ -245,7 +242,7 @@ export function CaptureViewportPopover({
       )}
 
       {/* Footer Controls */}
-      <div className="flex items-center justify-end gap-2 border-t border-zinc-800/80 pt-3">
+      <div className="flex items-center justify-end gap-2 border-t border-zinc-800 pt-2.5">
         <button
           data-action="capture-cancel-btn"
           type="button"
@@ -253,7 +250,7 @@ export function CaptureViewportPopover({
             onClose();
             triggerRef.current?.focus();
           }}
-          className="rounded-lg border border-zinc-700 bg-zinc-800/80 px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+          className="rounded border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
         >
           Cancel
         </button>
@@ -261,7 +258,7 @@ export function CaptureViewportPopover({
           data-action="capture-submit-btn"
           type="button"
           onClick={handleAction}
-          className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-all hover:bg-indigo-500 active:scale-95"
+          className="flex items-center gap-1.5 rounded bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-950 transition-colors hover:bg-white"
         >
           <Camera className="h-3.5 w-3.5" />
           <span>Capture</span>

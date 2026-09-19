@@ -597,7 +597,7 @@ export function ResponsiveStudio({
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
                 placeholder="https://yourwebsite.com"
-                className="w-full rounded-md border border-zinc-800 bg-zinc-900/80 py-1.5 pl-8 pr-7 text-xs font-medium text-indigo-400 placeholder-zinc-500 transition-colors focus:border-zinc-700 focus:outline-none"
+                className="w-full rounded-md border border-zinc-800 bg-zinc-900/80 py-1.5 pl-8 pr-7 text-xs font-medium text-zinc-100 placeholder-zinc-500 transition-colors focus:border-zinc-700 focus:outline-none"
               />
               {urlInput && (
                 <button
@@ -622,7 +622,7 @@ export function ResponsiveStudio({
               </button>
 
               {addMenuOpen && (
-                <div className="absolute left-0 top-full z-50 mt-2 max-h-[380px] w-72 overflow-y-auto rounded-xl border border-zinc-700/80 bg-zinc-900 p-1.5 shadow-2xl">
+                <div className="absolute left-0 top-full z-50 mt-1 max-h-[380px] w-72 overflow-y-auto rounded-md border border-zinc-800 bg-zinc-950 p-1 shadow-lg">
                   {DEVICE_CATEGORIES.map((category, catIdx) => {
                     const items = Object.entries(DEVICE_PRESETS).filter(
                       ([_, preset]) => preset.category === category
@@ -631,7 +631,7 @@ export function ResponsiveStudio({
                     return (
                       <div
                         key={category}
-                        className={catIdx > 0 ? "mt-1.5 border-t border-zinc-800/80 pt-1.5" : ""}
+                        className={catIdx > 0 ? "mt-1 border-t border-zinc-800/80 pt-1" : ""}
                       >
                         <div className="px-2 py-1 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-zinc-500">
                           {category}
@@ -652,7 +652,7 @@ export function ResponsiveStudio({
                                 key={key}
                                 type="button"
                                 onClick={() => handleAddDevice(key)}
-                                className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+                                className="flex w-full items-center justify-between rounded px-2 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
                               >
                                 <div className="flex items-center gap-2 overflow-hidden">
                                   <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-zinc-800/80 text-zinc-400">
@@ -730,18 +730,29 @@ export function ResponsiveStudio({
           </div>
 
           {/* Sync Scroll Toggle */}
-          <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-300 select-none">
-            <div className="relative inline-flex items-center">
-              <input
-                type="checkbox"
-                checked={syncScroll}
-                onChange={(e) => setSyncScroll(e.target.checked)}
-                className="sr-only peer"
+          <div className="flex items-center gap-2 select-none">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={syncScroll}
+              onClick={() => setSyncScroll(!syncScroll)}
+              className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-150 ease-in-out focus:outline-none ${
+                syncScroll
+                  ? "border-white bg-white"
+                  : "border-zinc-700 bg-zinc-800 hover:border-zinc-600"
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-2.5 w-2.5 rounded-full transition-transform duration-150 ease-in-out ${
+                  syncScroll
+                    ? "translate-x-3.5 bg-zinc-950"
+                    : "translate-x-0.5 bg-zinc-300"
+                }`}
               />
-              <div className="h-4 w-7 rounded-full bg-zinc-800 border border-zinc-700 peer-checked:bg-indigo-600 transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-3" />
-            </div>
+            </button>
             <span className="text-xs text-zinc-300 font-medium">Sync Scroll</span>
-          </label>
+          </div>
 
           {/* Scale Buttons (Segmented Control) */}
           <div className="flex items-center rounded-md border border-zinc-800 bg-zinc-900/90 p-0.5 text-xs">

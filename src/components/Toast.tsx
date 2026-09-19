@@ -42,14 +42,14 @@ function ToastItem({
   }, [toast.id, toast.duration, onDismiss]);
 
   const icons = {
-    success: <CheckCircle2 className="h-4 w-4 text-emerald-400" />,
-    error: <AlertCircle className="h-4 w-4 text-rose-400" />,
-    info: <Info className="h-4 w-4 text-sky-400" />,
+    success: <CheckCircle2 className="h-4 w-4 text-white" />,
+    error: <AlertCircle className="h-4 w-4 text-white" />,
+    info: <Info className="h-4 w-4 text-zinc-300" />,
   };
 
   const borders = {
-    success: "border-emerald-900/60 bg-zinc-900/95 text-zinc-100",
-    error: "border-rose-900/60 bg-zinc-900/95 text-zinc-100",
+    success: "border-zinc-700 bg-zinc-900/95 text-zinc-100",
+    error: "border-zinc-600 bg-zinc-900/95 text-zinc-100",
     info: "border-zinc-800 bg-zinc-900/95 text-zinc-100",
   };
 

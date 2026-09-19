@@ -676,31 +676,30 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
   return (
     <div className="flex flex-1 flex-col lg:flex-row overflow-hidden bg-zinc-950">
       {/* Settings & Controls Sidebar */}
-      <div className="w-full lg:w-96 flex-shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-800/80 bg-zinc-900/40 p-5 overflow-y-auto space-y-5">
-        {/* Section 1: Website URL & Capture */}
-        <div className="space-y-3">
+      <div className="w-full lg:w-80 flex-shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-800 bg-zinc-950 p-3.5 overflow-y-auto space-y-3.5">
+        {/* Source URL & Capture */}
+        <div className="space-y-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-              1. Website URL
+            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-zinc-400">
+              Target URL
             </span>
-            <span className="text-[10px] text-zinc-500">Live responsive capture</span>
           </div>
 
-          <form onSubmit={handleCaptureUrl} className="space-y-2.5">
+          <form onSubmit={handleCaptureUrl} className="space-y-2">
             <div className="relative flex items-center">
-              <Globe className="pointer-events-none absolute left-3.5 h-3.5 w-3.5 text-zinc-500" />
+              <Globe className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-zinc-500" />
               <input
                 type="text"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
                 placeholder="https://yourwebsite.com"
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 py-2 pl-9 pr-9 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors focus:border-zinc-700"
+                className="w-full rounded-md border border-zinc-800 bg-zinc-900/90 py-1.5 pl-8 pr-7 text-xs text-zinc-100 placeholder-zinc-500 outline-none transition-colors focus:border-zinc-700"
               />
               {urlInput && (
                 <button
                   type="button"
                   onClick={() => setUrlInput("")}
-                  className="absolute right-3 text-zinc-500 hover:text-zinc-300"
+                  className="absolute right-2 text-zinc-500 hover:text-zinc-300"
                   title="Clear input"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -711,12 +710,12 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
             <button
               type="submit"
               disabled={isCapturing}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-100 px-4 py-2.5 text-xs font-semibold text-zinc-900 shadow-sm transition-all hover:bg-white active:scale-[0.98] disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-white px-3 py-1.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200 active:scale-[0.99] disabled:opacity-50"
             >
               {isCapturing ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-900" />
-                  <span>Emulating Device Viewport...</span>
+                  <span>Emulating Viewport...</span>
                 </>
               ) : (
                 <>
@@ -728,11 +727,11 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
           </form>
 
           {/* Alternative Ingestion Buttons */}
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={handleCaptureScreen}
-              className="flex-1 rounded-lg border border-zinc-800/80 bg-zinc-950/60 py-1.5 text-[11px] font-medium text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 transition-colors text-center"
+              className="flex-1 rounded-md border border-zinc-800 bg-zinc-900/60 py-1 text-[11px] font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors text-center"
             >
               Capture Screen
             </button>
@@ -740,9 +739,9 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex-1 rounded-lg border border-zinc-800/80 bg-zinc-950/60 py-1.5 text-[11px] font-medium text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 transition-colors text-center"
+              className="flex-1 rounded-md border border-zinc-800 bg-zinc-900/60 py-1 text-[11px] font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors text-center"
             >
-              Upload / Paste
+              Upload Image
             </button>
             <input
               ref={fileInputRef}
@@ -754,13 +753,13 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
           </div>
         </div>
 
-        <div className="h-px bg-zinc-800/60" />
+        <div className="h-px bg-zinc-800" />
 
-        {/* Section 2: Viewport Preset */}
-        <div className="space-y-3">
+        {/* Viewport Preset */}
+        <div className="space-y-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-              2. Device Viewport
+            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-zinc-400">
+              Viewport
             </span>
           </div>
 
@@ -772,9 +771,9 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
 
           {/* Custom Size Fields */}
           {selectedPreset === "custom" && (
-            <div className="flex items-center gap-2 pt-1">
-              <div className="flex flex-1 items-center rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs">
-                <span className="mr-2 text-zinc-500">W</span>
+            <div className="flex items-center gap-2">
+              <div className="flex flex-1 items-center rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs">
+                <span className="mr-1.5 text-zinc-500">W</span>
                 <input
                   type="number"
                   value={customW}
@@ -784,8 +783,8 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
                 <span className="text-[10px] text-zinc-500">PX</span>
               </div>
               <span className="text-zinc-600">×</span>
-              <div className="flex flex-1 items-center rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs">
-                <span className="mr-2 text-zinc-500">H</span>
+              <div className="flex flex-1 items-center rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs">
+                <span className="mr-1.5 text-zinc-500">H</span>
                 <input
                   type="number"
                   value={customH}
@@ -798,35 +797,44 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
           )}
 
           {/* Full Page Capture Toggle */}
-          <div className="flex items-center justify-between py-1 px-1">
-            <div>
-              <span className="block text-xs font-medium text-zinc-300">Full Page Capture</span>
-              <span className="block text-[10px] text-zinc-500">Auto-scrolls entire page length</span>
-            </div>
-            <label className="relative inline-flex cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={fullPage}
-                onChange={(e) => {
-                  setFullPage(e.target.checked);
-                  saveSettings({ fullPage: e.target.checked });
-                }}
-                className="sr-only peer"
+          <div className="flex items-center justify-between py-0.5">
+            <span className="text-xs font-medium text-zinc-300">Full Page Capture</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={fullPage}
+              onClick={() => {
+                const next = !fullPage;
+                setFullPage(next);
+                saveSettings({ fullPage: next });
+              }}
+              className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-150 ease-in-out focus:outline-none ${
+                fullPage
+                  ? "border-white bg-white"
+                  : "border-zinc-700 bg-zinc-800 hover:border-zinc-600"
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-2.5 w-2.5 rounded-full transition-transform duration-150 ease-in-out ${
+                  fullPage
+                    ? "translate-x-3.5 bg-zinc-950"
+                    : "translate-x-0.5 bg-zinc-300"
+                }`}
               />
-              <div className="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-            </label>
+            </button>
           </div>
         </div>
 
-        <div className="h-px bg-zinc-800/60" />
+        <div className="h-px bg-zinc-800" />
 
-        {/* Section 3: Studio Mockup Frame & Styling */}
-        <div className="space-y-3">
+        {/* Frame & Presentation */}
+        <div className="space-y-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-              3. Device Frame &amp; Backdrop
+            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-zinc-400">
+              Frame &amp; Presentation
             </span>
-            <span className="rounded bg-indigo-500/20 px-1.5 py-0.2 text-[9px] font-semibold text-indigo-300">
+            <span className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 text-[9px] font-semibold text-zinc-200">
               PRO
             </span>
           </div>
@@ -859,21 +867,18 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
 
           {/* Canvas Fit Mode */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-[10px] font-medium text-zinc-400">Canvas Screen Fitting</label>
-              <span className="text-[10px] text-zinc-500">Aspect-ratio preserved</span>
-            </div>
-            <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-zinc-800 bg-zinc-950 p-1">
+            <label className="block text-[10px] font-medium text-zinc-400 mb-1">Canvas Screen Fitting</label>
+            <div className="grid grid-cols-2 gap-1 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
               <button
                 type="button"
                 onClick={() => {
                   setFitMode("smart");
                   saveSettings({ fitMode: "smart" });
                 }}
-                className={`rounded-lg py-1.5 text-center text-xs font-medium transition-colors ${
+                className={`rounded py-1 text-center text-xs font-medium transition-colors ${
                   fitMode === "smart" || fitMode === "cover"
-                    ? "bg-zinc-800 text-zinc-100 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-300"
+                    ? "bg-white text-zinc-950 shadow-sm font-semibold"
+                    : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
                 Responsive Fill
@@ -884,10 +889,10 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
                   setFitMode("contain");
                   saveSettings({ fitMode: "contain" });
                 }}
-                className={`rounded-lg py-1.5 text-center text-xs font-medium transition-colors ${
+                className={`rounded py-1 text-center text-xs font-medium transition-colors ${
                   fitMode === "contain"
-                    ? "bg-zinc-800 text-zinc-100 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-300"
+                    ? "bg-white text-zinc-950 shadow-sm font-semibold"
+                    : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
                 Fit Whole Page
@@ -907,8 +912,8 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
 
           {/* iPhone Notch settings */}
           {selectedFrame.toLowerCase().includes("iphone") && (
-            <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/60 p-3 space-y-2">
-              <span className="text-[10px] font-medium text-zinc-400">iPhone Dynamic Island / Notch</span>
+            <div className="flex items-center justify-between border-t border-zinc-800 pt-2.5">
+              <span className="text-[10px] font-medium text-zinc-400">Header Theme</span>
               <div className="flex items-center gap-3">
                 <input
                   type="color"
@@ -918,7 +923,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
                     setAutoNotch(false);
                     saveSettings({ notchColor: e.target.value, autoNotch: false });
                   }}
-                  className="h-6 w-8 cursor-pointer rounded border-0 bg-transparent"
+                  className="h-5 w-7 cursor-pointer rounded border border-zinc-800 bg-transparent"
                   title="Pick Header Color"
                 />
                 <label className="flex cursor-pointer items-center gap-1.5 text-xs text-zinc-400">
@@ -929,9 +934,9 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
                       setAutoNotch(e.target.checked);
                       saveSettings({ autoNotch: e.target.checked });
                     }}
-                    className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-800 text-indigo-500 focus:ring-0"
+                    className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-800 accent-white text-white focus:ring-0"
                   />
-                  <span>Auto-detect Header Theme</span>
+                  <span>Auto</span>
                 </label>
               </div>
             </div>
@@ -942,11 +947,11 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
       {/* Canvas Mockup Preview Surface */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Preview Topbar */}
-        <div className="flex items-center justify-between border-b border-zinc-800/80 bg-zinc-900/60 px-5 py-2.5 backdrop-blur-md">
+        <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 py-2">
           <div className="flex items-center gap-3">
             <span className="text-xs font-semibold text-zinc-300">Mockup Preview</span>
             {compositeDims && (
-              <span className="rounded bg-zinc-800 px-2 py-0.5 text-[11px] font-mono tabular-nums text-zinc-400">
+              <span className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[10.5px] font-mono tabular-nums text-zinc-400">
                 {compositeDims}
               </span>
             )}
@@ -954,7 +959,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
               <button
                 type="button"
                 onClick={() => handleCaptureUrl(undefined, urlInput, selectedPreset, selectedFrame)}
-                className="flex items-center gap-1 rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2.5 py-0.5 text-[10px] font-medium text-indigo-300 hover:bg-indigo-500/20 transition-colors"
+                className="flex items-center gap-1 rounded border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[10px] font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
               >
                 <RefreshCw className="h-2.5 w-2.5" />
                 <span>Re-render responsive for {DEVICE_PRESETS[selectedPreset]?.name || selectedPreset}</span>
@@ -963,7 +968,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
           </div>
 
           {/* Center: Canvas Zoom & Pan Controls */}
-          <div className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-950/80 p-0.5">
+          <div className="flex items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
             <button
               type="button"
               onClick={handleZoomOut}
@@ -1026,9 +1031,9 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
               type="button"
               onClick={handleCopy}
               disabled={!compositeDataUrl || isCompositing}
-              className="flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900 px-3.5 py-1 text-xs font-medium text-zinc-200 transition-all hover:border-zinc-700 hover:text-white active:scale-95 disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1 text-xs font-medium text-zinc-200 transition-all hover:border-zinc-700 hover:text-white active:scale-95 disabled:opacity-40"
             >
-              {copySuccess ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+              {copySuccess ? <Check className="h-3.5 w-3.5 text-white" /> : <Copy className="h-3.5 w-3.5" />}
               <span>{copySuccess ? "Copied!" : "Copy"}</span>
             </button>
 
@@ -1037,7 +1042,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
               type="button"
               onClick={handleDownload}
               disabled={!compositeDataUrl || isCompositing}
-              className="flex items-center gap-1.5 rounded-full bg-zinc-100 px-3.5 py-1 text-xs font-semibold text-zinc-900 shadow-sm transition-all hover:bg-white active:scale-95 disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-md bg-white px-3 py-1 text-xs font-semibold text-zinc-950 shadow-sm transition-all hover:bg-zinc-200 active:scale-95 disabled:opacity-40"
             >
               <Download className="h-3.5 w-3.5" />
               <span>Download PNG</span>
@@ -1054,15 +1059,15 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onDoubleClick={handleDoubleClick}
-          className={`studio-grid-bg relative flex flex-1 items-center justify-center overflow-hidden p-8 select-none ${
+          className={`studio-grid-bg relative flex flex-1 items-center justify-center overflow-hidden p-6 select-none ${
             isDragging ? "cursor-grabbing" : "cursor-grab"
           }`}
         >
           {/* Non-blocking update indicator when re-compositing or capturing */}
           {(isCompositing || isCapturing) && compositeDataUrl && (
-            <div className="absolute top-4 z-20 flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/90 px-3.5 py-1.5 shadow-xl backdrop-blur-md text-xs text-zinc-300">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />
-              <span>{isCapturing ? "Emulating device viewport..." : "Updating mockup..."}</span>
+            <div className="absolute top-4 z-20 flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1 shadow-md text-xs text-zinc-300">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+              <span>{isCapturing ? "Emulating viewport..." : "Updating mockup..."}</span>
             </div>
           )}
 
@@ -1082,12 +1087,12 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
                 src={compositeDataUrl}
                 alt="Device Mockup"
                 draggable={false}
-                className="max-h-[78vh] max-w-[85%] object-contain rounded-lg shadow-2xl"
+                className="max-h-[78vh] max-w-[85%] object-contain rounded border border-zinc-800/80 shadow-md"
               />
             </div>
           ) : isCompositing || isCapturing ? (
             <div className="flex flex-col items-center gap-2 pointer-events-none">
-              <Loader2 className="h-7 w-7 animate-spin text-indigo-400" />
+              <Loader2 className="h-7 w-7 animate-spin text-white" />
               <span className="text-xs text-zinc-400">
                 {isCapturing ? "Emulating responsive device viewport..." : "Compositing realistic device frame..."}
               </span>
@@ -1100,7 +1105,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
 
           {/* Floating Zoom & Pan Pill */}
           {compositeDataUrl && (
-            <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2 rounded-xl border border-zinc-800/80 bg-zinc-900/90 px-3 py-1.5 shadow-xl backdrop-blur-md text-xs text-zinc-400">
+            <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-950/90 px-2.5 py-1 shadow-md backdrop-blur-md text-xs text-zinc-400">
               <span className="font-mono text-[11px] tabular-nums text-zinc-300">
                 {Math.round(canvasZoom * 100)}%
               </span>

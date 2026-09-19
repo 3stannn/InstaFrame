@@ -255,7 +255,7 @@ export function ViewportSelectionOverlay({
           {/* Active selection marquee window */}
           <div
             onMouseDown={handleStartMove}
-            className="absolute cursor-move border-2 border-indigo-400 bg-transparent shadow-[0_0_0_1px_rgba(0,0,0,0.4)]"
+            className="absolute cursor-move border-2 border-white bg-transparent shadow-[0_0_0_1px_rgba(0,0,0,0.8)]"
             style={{
               left: `${rect.x}px`,
               top: `${rect.y}px`,
@@ -265,7 +265,7 @@ export function ViewportSelectionOverlay({
           >
             {/* Dimensions Badge */}
             <div className="absolute -top-7 left-0 flex items-center gap-1.5 rounded bg-zinc-950/90 px-2 py-0.5 text-[11px] font-mono font-medium text-zinc-100 border border-zinc-700/80 shadow-lg pointer-events-none">
-              <Crop className="h-3 w-3 text-indigo-400" />
+              <Crop className="h-3 w-3 text-white" />
               <span>
                 {outputW} × {outputH} px
               </span>
@@ -274,42 +274,42 @@ export function ViewportSelectionOverlay({
             {/* Corner Resize Handles */}
             <div
               onMouseDown={(e) => handleStartResize(e, "nw")}
-              className="absolute -left-1.5 -top-1.5 h-3.5 w-3.5 cursor-nwse-resize rounded-full border-2 border-indigo-500 bg-white shadow-md hover:scale-125 transition-transform"
+              className="absolute -left-1.5 -top-1.5 h-3.5 w-3.5 cursor-nwse-resize rounded-full border-2 border-zinc-950 bg-white shadow-md hover:scale-125 transition-transform"
             />
             <div
               onMouseDown={(e) => handleStartResize(e, "ne")}
-              className="absolute -right-1.5 -top-1.5 h-3.5 w-3.5 cursor-nesw-resize rounded-full border-2 border-indigo-500 bg-white shadow-md hover:scale-125 transition-transform"
+              className="absolute -right-1.5 -top-1.5 h-3.5 w-3.5 cursor-nesw-resize rounded-full border-2 border-zinc-950 bg-white shadow-md hover:scale-125 transition-transform"
             />
             <div
               onMouseDown={(e) => handleStartResize(e, "se")}
-              className="absolute -right-1.5 -bottom-1.5 h-3.5 w-3.5 cursor-nwse-resize rounded-full border-2 border-indigo-500 bg-white shadow-md hover:scale-125 transition-transform"
+              className="absolute -right-1.5 -bottom-1.5 h-3.5 w-3.5 cursor-nwse-resize rounded-full border-2 border-zinc-950 bg-white shadow-md hover:scale-125 transition-transform"
             />
             <div
               onMouseDown={(e) => handleStartResize(e, "sw")}
-              className="absolute -left-1.5 -bottom-1.5 h-3.5 w-3.5 cursor-nesw-resize rounded-full border-2 border-indigo-500 bg-white shadow-md hover:scale-125 transition-transform"
+              className="absolute -left-1.5 -bottom-1.5 h-3.5 w-3.5 cursor-nesw-resize rounded-full border-2 border-zinc-950 bg-white shadow-md hover:scale-125 transition-transform"
             />
 
             {/* Edge Resize Handles */}
             <div
               onMouseDown={(e) => handleStartResize(e, "n")}
-              className="absolute left-1/2 -top-1.5 h-2.5 w-6 -translate-x-1/2 cursor-ns-resize rounded-full border border-indigo-500 bg-white shadow-sm"
+              className="absolute left-1/2 -top-1.5 h-2.5 w-6 -translate-x-1/2 cursor-ns-resize rounded-full border border-zinc-950 bg-white shadow-sm"
             />
             <div
               onMouseDown={(e) => handleStartResize(e, "s")}
-              className="absolute left-1/2 -bottom-1.5 h-2.5 w-6 -translate-x-1/2 cursor-ns-resize rounded-full border border-indigo-500 bg-white shadow-sm"
+              className="absolute left-1/2 -bottom-1.5 h-2.5 w-6 -translate-x-1/2 cursor-ns-resize rounded-full border border-zinc-950 bg-white shadow-sm"
             />
             <div
               onMouseDown={(e) => handleStartResize(e, "w")}
-              className="absolute top-1/2 -left-1.5 h-6 w-2.5 -translate-y-1/2 cursor-ew-resize rounded-full border border-indigo-500 bg-white shadow-sm"
+              className="absolute top-1/2 -left-1.5 h-6 w-2.5 -translate-y-1/2 cursor-ew-resize rounded-full border border-zinc-950 bg-white shadow-sm"
             />
             <div
               onMouseDown={(e) => handleStartResize(e, "e")}
-              className="absolute top-1/2 -right-1.5 h-6 w-2.5 -translate-y-1/2 cursor-ew-resize rounded-full border border-indigo-500 bg-white shadow-sm"
+              className="absolute top-1/2 -right-1.5 h-6 w-2.5 -translate-y-1/2 cursor-ew-resize rounded-full border border-zinc-950 bg-white shadow-sm"
             />
 
             {/* Floating Action Toolbar */}
             <div
-              className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-xl border border-zinc-700/80 bg-zinc-900/95 p-1.5 shadow-2xl backdrop-blur-md transition-all ${
+              className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-950/95 p-1 shadow-lg backdrop-blur-md transition-all ${
                 rect.y + rect.height + 50 > deviceHeight
                   ? "bottom-3"
                   : "top-full mt-3"
@@ -320,7 +320,7 @@ export function ViewportSelectionOverlay({
                 data-action="selection-cancel-btn"
                 type="button"
                 onClick={onCancel}
-                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                className="flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-zinc-300 hover:bg-zinc-900 hover:text-white transition-colors"
               >
                 <X className="h-3 w-3" />
                 <span>Cancel</span>
@@ -333,7 +333,7 @@ export function ViewportSelectionOverlay({
                     onConfirmCrop(rect);
                   }
                 }}
-                className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-500 shadow-md transition-colors"
+                className="flex items-center gap-1 rounded bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-950 hover:bg-white transition-colors"
               >
                 <Check className="h-3 w-3" />
                 <span>
@@ -347,7 +347,7 @@ export function ViewportSelectionOverlay({
 
       {/* Guide hint at top of overlay */}
       {(!rect || rect.width <= 0) && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-full border border-zinc-700 bg-zinc-900/90 px-4 py-1.5 text-xs text-zinc-200 shadow-xl pointer-events-none">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded border border-zinc-800 bg-zinc-950/90 px-3 py-1 text-xs text-zinc-300 shadow-md pointer-events-none">
           Click and drag to select an area (or press Escape to cancel)
         </div>
       )}

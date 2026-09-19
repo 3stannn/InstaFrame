@@ -7,6 +7,7 @@ export interface ToastMessage {
   id: string;
   type: "success" | "error" | "info";
   message: string;
+  duration?: number;
 }
 
 interface ToastProps {
@@ -32,11 +33,13 @@ function ToastItem({
   onDismiss: (id: string) => void;
 }) {
   useEffect(() => {
+    const duration = toast.duration !== undefined ? toast.duration : 3500;
+    if (duration <= 0) return; // persistent until dismissed or updated
     const timer = setTimeout(() => {
       onDismiss(toast.id);
-    }, 3500);
+    }, duration);
     return () => clearTimeout(timer);
-  }, [toast.id, onDismiss]);
+  }, [toast.id, toast.duration, onDismiss]);
 
   const icons = {
     success: <CheckCircle2 className="h-4 w-4 text-emerald-400" />,

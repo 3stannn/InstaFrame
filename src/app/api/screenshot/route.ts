@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import puppeteer from "puppeteer-core";
+import puppeteer, { Browser, BrowserContext, Page } from "puppeteer-core";
 import fs from "fs";
 import os from "os";
 import path from "path";
 import net from "net";
 import { DEVICE_PRESETS } from "@/lib/devices";
 import { validateUrlSafe, isPrivateOrBlockedIP } from "@/lib/ssrf";
+import {
+  CaptureLogger,
+  FailureClassification,
+  BrowserBackend,
+} from "@/lib/capture-logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+// Reserve 10 seconds for safe cleanup and structured error response within 60s maxDuration
+const TOTAL_OPERATION_BUDGET_MS = 50000;
+const MAX_TOTAL_PIXELS = 35_000_000; // ~35 megapixels budget before OOM/payload overflow
+const MAX_FULL_PAGE_HEIGHT = 16384; // 16K px max full-page height
 
 function getLocalChromePath(): string | null {
   const localAppData = process.env.LOCALAPPDATA || "";
@@ -21,8 +31,8 @@ function getLocalChromePath(): string | null {
     path.join(programFiles, "Google", "Chrome", "Application", "chrome.exe"),
     path.join(programFilesX86, "Google", "Chrome", "Application", "chrome.exe"),
     localAppData ? path.join(localAppData, "Google", "Chrome", "Application", "chrome.exe") : null,
-    path.join(programFilesX86, "Microsoft", "Edge", "Application", "msedge.exe"),
     path.join(programFiles, "Microsoft", "Edge", "Application", "msedge.exe"),
+    path.join(programFilesX86, "Microsoft", "Edge", "Application", "msedge.exe"),
     localAppData ? path.join(localAppData, "Microsoft", "Edge", "Application", "msedge.exe") : null,
     path.join(programFiles, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
     localAppData ? path.join(localAppData, "BraveSoftware", "Brave-Browser", "Application", "brave.exe") : null,
@@ -41,8 +51,55 @@ function getLocalChromePath(): string | null {
   return null;
 }
 
-export async function POST(request: NextRequest) {
+/**
+ * Calculates remaining budget in milliseconds from startTime
+ */
+function getRemainingBudget(startTime: number): number {
+  const elapsed = Date.now() - startTime;
+  return Math.max(0, TOTAL_OPERATION_BUDGET_MS - elapsed);
+}
+
+/**
+ * Helper to run an async action with an abortable deadline
+ */
+async function withTimeout<T>(
+  action: (signal: AbortSignal) => Promise<T>,
+  timeoutMs: number,
+  timeoutErrorMsg: string
+): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
+    const result = await Promise.race([
+      action(controller.signal),
+      new Promise<never>((_, reject) => {
+        controller.signal.addEventListener("abort", () => {
+          const err = new Error(timeoutErrorMsg);
+          err.name = "TimeoutError";
+          reject(err);
+        });
+      }),
+    ]);
+    return result;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const operationStart = Date.now();
+  let logger: CaptureLogger | null = null;
+
+  let browser: Browser | null = null;
+  let context: BrowserContext | null = null;
+  let page: Page | null = null;
+  let isRemote = false;
+  let tempUserDataDir: string | null = null;
+  let inFlightLaunch: Promise<Browser> | null = null;
+
+  try {
+    // 1. Validation Stage
     const body = await request.json().catch(() => ({}));
     const {
       url,
@@ -52,9 +109,24 @@ export async function POST(request: NextRequest) {
       frameId = "none",
       zoomLevel = 100,
       captureFullPage = false,
+      captureQuality = "preview",
     } = body;
 
+    const validatedQuality: "preview" | "export" =
+      captureQuality === "export" ? "export" : "preview";
+
+    logger = new CaptureLogger({
+      url: String(url || ""),
+      presetKey: String(presetKey),
+      quality: validatedQuality,
+      captureFullPage: Boolean(captureFullPage),
+    });
+
+    logger.startStage("validation");
+
     if (!url) {
+      logger.endStage("validation");
+      logger.fail("VALIDATION_ERROR", "Missing url parameter", 400);
       return NextResponse.json({ error: "Missing url parameter" }, { status: 400 });
     }
 
@@ -63,37 +135,42 @@ export async function POST(request: NextRequest) {
       targetUrl = "https://" + targetUrl;
     }
 
-    // 1. SSRF pre-flight check
+    // SSRF pre-flight validation
     const validation = await validateUrlSafe(targetUrl);
     if (!validation.safe) {
+      logger.endStage("validation");
+      logger.fail("SSRF_BLOCKED", validation.error || "Security check rejected URL", 403);
       return NextResponse.json(
         { error: `Security check rejected URL: ${validation.error}` },
         { status: 403 }
       );
     }
 
-    // 2. Resolve device specifications
+    // Resolve device specifications
     let deviceWidth = 1280;
     let deviceHeight = 832;
-    let deviceScaleFactor = 2;
+    let baseScaleFactor = 2;
     let isMobile = false;
     let userAgent: string | null = null;
 
     if (presetKey === "custom") {
-      deviceWidth = Math.max(100, Math.min(7680, parseInt(customW, 10) || 1440));
-      deviceHeight = Math.max(100, Math.min(7680, parseInt(customH, 10) || 900));
-      deviceScaleFactor = 1;
+      deviceWidth = Math.max(100, Math.min(7680, parseInt(String(customW), 10) || 1440));
+      deviceHeight = Math.max(100, Math.min(7680, parseInt(String(customH), 10) || 900));
+      baseScaleFactor = 1;
       isMobile = deviceWidth <= 500;
     } else {
       const preset = DEVICE_PRESETS[presetKey] || DEVICE_PRESETS["macbook-air-13"];
       deviceWidth = preset.width;
       deviceHeight = preset.height;
-      deviceScaleFactor = preset.deviceScaleFactor || (preset.mobile ? 3 : 2);
+      baseScaleFactor = preset.deviceScaleFactor || (preset.mobile ? 3 : 2);
       isMobile = preset.mobile || false;
       userAgent = preset.userAgent || null;
     }
 
-    // Use authentic mobile user-agent if mobile and not specified
+    // Preview mode uses 1x density; export mode uses bounded higher density (up to 2x)
+    const deviceScaleFactor =
+      validatedQuality === "preview" ? 1 : Math.min(baseScaleFactor, 2);
+
     if (isMobile && !userAgent) {
       userAgent =
         "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
@@ -117,45 +194,83 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Prioritize PUPPETEER_WS_ENDPOINT if set, falling back to BROWSERLESS_URL
+    logger.endStage("validation");
+
+    // 2. Backend Resolution Stage
+    logger.startStage("backend_resolution");
+
     const wsEndpoint = (
       process.env.PUPPETEER_WS_ENDPOINT ||
       process.env.BROWSERLESS_URL ||
       ""
     ).trim();
-    let browser: Awaited<ReturnType<typeof puppeteer.launch>>;
-    let tempUserDataDir: string | null = null;
+
+    let backendType: BrowserBackend = "unresolved";
 
     if (wsEndpoint) {
       if (!/^wss?:\/\//i.test(wsEndpoint)) {
-        console.error("Invalid remote browser WebSocket URL scheme");
+        logger.endStage("backend_resolution");
+        logger.fail("ENDPOINT_INVALID", "Remote browser endpoint must use ws:// or wss:// scheme", 500);
         return NextResponse.json(
-          { error: "Remote browser endpoint must use ws:// or wss:// scheme" },
+          { error: "Remote browser endpoint must use ws:// or wss:// scheme." },
           { status: 500 }
         );
       }
+      backendType = "remote-ws";
+    } else {
+      const localPath = getLocalChromePath();
+      if (localPath) {
+        backendType = "local-chrome";
+      } else {
+        backendType = "sparticuz-chromium";
+      }
+    }
 
+    logger.setBackend(backendType);
+    logger.endStage("backend_resolution");
+
+    // 3. Launch / Connect Stage
+    logger.startStage("launch_connect");
+    const launchBudget = Math.min(15000, getRemainingBudget(operationStart) - 15000);
+
+    if (backendType === "remote-ws") {
+      isRemote = true;
       try {
-        browser = await puppeteer.connect({
+        inFlightLaunch = puppeteer.connect({
           browserWSEndpoint: wsEndpoint,
           protocolTimeout: 30000,
         });
+        browser = await withTimeout(
+          () => inFlightLaunch!,
+          launchBudget,
+          "Connection to remote browser endpoint timed out"
+        );
+        inFlightLaunch = null;
       } catch (connectErr: unknown) {
-        console.error("Failed to connect to remote browser endpoint:", connectErr);
+        inFlightLaunch = null;
+        const errMsg = connectErr instanceof Error ? connectErr.message : String(connectErr);
+        const isTimeout = connectErr instanceof Error && connectErr.name === "TimeoutError";
+        const classification: FailureClassification = isTimeout
+          ? "CONNECT_TIMEOUT"
+          : "BROWSER_UNAVAILABLE";
+        logger.endStage("launch_connect");
+        logger.fail(classification, errMsg, 502);
         return NextResponse.json(
-          { error: "Failed to connect to remote browser endpoint. Please verify configuration and provider status." },
+          {
+            error: isTimeout
+              ? "Remote browser connection timed out. Please verify provider status."
+              : "Failed to connect to remote browser endpoint. Please verify configuration.",
+          },
           { status: 502 }
         );
       }
-    } else {
-      const localPath = getLocalChromePath();
+    } else if (backendType === "local-chrome") {
+      const localPath = getLocalChromePath()!;
+      const uniqueProfileId = `instaframe_prof_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      tempUserDataDir = path.join(os.tmpdir(), uniqueProfileId);
 
-      if (localPath) {
-        // Local desktop browser (Chrome, Edge, Brave)
-        const uniqueProfileId = `instaframe_prof_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-        tempUserDataDir = path.join(os.tmpdir(), uniqueProfileId);
-
-        browser = await puppeteer.launch({
+      try {
+        inFlightLaunch = puppeteer.launch({
           executablePath: localPath,
           headless: true,
           userDataDir: tempUserDataDir,
@@ -181,196 +296,379 @@ export async function POST(request: NextRequest) {
             `--window-size=${deviceWidth},${emulatedHeight}`,
           ],
         });
-      } else {
-        // Serverless environment (e.g. Vercel / AWS Lambda) via @sparticuz/chromium
-        try {
-          const chromium = (await import("@sparticuz/chromium")).default;
-          let executablePath: string;
-          try {
-            executablePath = await chromium.executablePath();
-          } catch (binErr) {
-            console.warn("Local chromium bin missing, downloading pack fallback:", binErr);
-            executablePath = await chromium.executablePath(
-              "https://github.com/Sparticuz/chromium/releases/download/v153.0.0/chromium-v153.0.0-pack.tar"
-            );
-          }
+        browser = await withTimeout(
+          () => inFlightLaunch!,
+          launchBudget,
+          "Local browser launch timed out"
+        );
+        inFlightLaunch = null;
+      } catch (launchErr: unknown) {
+        inFlightLaunch = null;
+        logger.endStage("launch_connect");
+        logger.fail("BROWSER_UNAVAILABLE", launchErr, 500);
+        return NextResponse.json(
+          { error: "Failed to launch local browser instance." },
+          { status: 500 }
+        );
+      }
+    } else {
+      // Serverless environment (@sparticuz/chromium) without on-demand download fallback
+      try {
+        const chromium = (await import("@sparticuz/chromium")).default;
+        const executablePath = await chromium.executablePath();
 
-          browser = await puppeteer.launch({
-            executablePath,
-            headless: "shell",
-            defaultViewport: {
-              width: deviceWidth,
-              height: emulatedHeight,
-              deviceScaleFactor,
-            },
-            args: chromium.args,
-          });
-        } catch (serverlessErr: unknown) {
-          console.error("Failed to launch serverless chromium:", serverlessErr);
-          return NextResponse.json(
-            {
-              error:
-                "Could not launch browser in this environment. For custom cloud hosting, set PUPPETEER_WS_ENDPOINT or BROWSERLESS_URL in your environment variables.",
-            },
-            { status: 500 }
-          );
+        if (!executablePath) {
+          throw new Error("Chromium executable path is empty");
         }
+
+        inFlightLaunch = puppeteer.launch({
+          executablePath,
+          headless: "shell",
+          defaultViewport: {
+            width: deviceWidth,
+            height: emulatedHeight,
+            deviceScaleFactor,
+          },
+          args: chromium.args,
+        });
+        browser = await withTimeout(
+          () => inFlightLaunch!,
+          launchBudget,
+          "Serverless Chromium launch timed out"
+        );
+        inFlightLaunch = null;
+      } catch (serverlessErr: unknown) {
+        inFlightLaunch = null;
+        const errMsg =
+          serverlessErr instanceof Error ? serverlessErr.message : String(serverlessErr);
+        logger.endStage("launch_connect");
+        logger.fail("BROWSER_UNAVAILABLE", errMsg, 503);
+        return NextResponse.json(
+          {
+            error:
+              "Chromium browser is unavailable in this deployment. Please configure PUPPETEER_WS_ENDPOINT or BROWSERLESS_URL in your environment variables.",
+          },
+          { status: 503 }
+        );
       }
     }
 
-    try {
-      const page = await browser.newPage();
+    logger.endStage("launch_connect");
 
-      // Configure exact viewport metrics for responsive rendering
-      await page.setViewport({
-        width: deviceWidth,
-        height: emulatedHeight,
-        deviceScaleFactor: deviceScaleFactor,
-        isMobile: isMobile,
-        hasTouch: isMobile,
-      });
+    // 4. Context and Page Setup Stage
+    logger.startStage("context_page_setup");
 
-      if (userAgent) {
-        await page.setUserAgent(userAgent);
-      }
+    if (isRemote) {
+      // Isolated context for shared remote browser sessions
+      context = await browser.createBrowserContext();
+      page = await context.newPage();
+    } else {
+      page = await browser.newPage();
+    }
 
-      // Intercept network requests for redirect & subresource SSRF defense
-      await page.setRequestInterception(true);
-      page.on("request", (req) => {
-        const reqUrl = req.url();
-        try {
-          const parsed = new URL(reqUrl);
-          const proto = parsed.protocol.toLowerCase();
-          if (proto !== "http:" && proto !== "https:" && proto !== "data:" && proto !== "blob:") {
-            req.abort("blockedbyclient");
-            return;
-          }
-          const host = parsed.hostname.toLowerCase();
-          if (
-            host === "localhost" ||
-            host.endsWith(".localhost") ||
-            host.endsWith(".local") ||
-            host.endsWith(".internal") ||
-            host === "metadata.google.internal" ||
-            host === "instance-data" ||
-            (net.isIP(host) && isPrivateOrBlockedIP(host))
-          ) {
-            req.abort("blockedbyclient");
-            return;
-          }
-          req.continue();
-        } catch {
-          req.abort("blockedbyclient");
-        }
-      });
+    await page.setViewport({
+      width: deviceWidth,
+      height: emulatedHeight,
+      deviceScaleFactor,
+      isMobile,
+      hasTouch: isMobile,
+    });
 
-      // Navigate to target URL on its real origin
+    if (userAgent) {
+      await page.setUserAgent(userAgent);
+    }
+
+    // SSRF defense-in-depth: intercept subresources & redirects
+    await page.setRequestInterception(true);
+    page.on("request", (req) => {
       try {
-        await page.goto(targetUrl, {
-          waitUntil: "domcontentloaded",
-          timeout: 16000,
-        });
-      } catch (navErr: unknown) {
-        const errStr = navErr instanceof Error ? navErr.message : String(navErr);
-        const isTimeout =
-          (navErr instanceof Error && navErr.name === "TimeoutError") ||
-          errStr.toLowerCase().includes("timeout");
+        const reqUrl = req.url();
+        const parsed = new URL(reqUrl);
+        const proto = parsed.protocol.toLowerCase();
+        if (proto !== "http:" && proto !== "https:" && proto !== "data:" && proto !== "blob:") {
+          req.abort("blockedbyclient").catch(() => {});
+          return;
+        }
+        const host = parsed.hostname.toLowerCase();
+        const cleanHost = host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
 
-        if (isTimeout) {
-          // Verify if usable content rendered before proceeding
-          const hasContent = await page
-            .evaluate(() => Boolean(document.body && document.body.children.length > 0))
-            .catch(() => false);
+        if (
+          cleanHost === "localhost" ||
+          cleanHost.endsWith(".localhost") ||
+          cleanHost.endsWith(".local") ||
+          cleanHost.endsWith(".internal") ||
+          cleanHost === "metadata.google.internal" ||
+          cleanHost === "instance-data" ||
+          cleanHost === "metadata" ||
+          cleanHost === "169.254.169.254" ||
+          cleanHost === "100.100.100.200" ||
+          (net.isIP(cleanHost) && isPrivateOrBlockedIP(cleanHost))
+        ) {
+          req.abort("blockedbyclient").catch(() => {});
+          return;
+        }
+        req.continue().catch(() => {});
+      } catch {
+        req.abort("blockedbyclient").catch(() => {});
+      }
+    });
 
-          if (!hasContent) {
-            return NextResponse.json(
-              { error: "Page load timed out before any usable content could render." },
-              { status: 504 }
+    logger.endStage("context_page_setup");
+
+    // 5. Navigation Stage
+    logger.startStage("navigation");
+    const navBudget = Math.min(16000, getRemainingBudget(operationStart) - 10000);
+
+    try {
+      await page.goto(targetUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: Math.max(3000, navBudget),
+      });
+    } catch (navErr: unknown) {
+      const errStr = navErr instanceof Error ? navErr.message : String(navErr);
+      const isTimeout =
+        (navErr instanceof Error && navErr.name === "TimeoutError") ||
+        errStr.toLowerCase().includes("timeout");
+
+      if (isTimeout) {
+        // Check if usable content rendered before failing
+        const hasContent = await page
+          .evaluate(() => {
+            const body = document.body;
+            if (!body) return false;
+            const text = body.innerText ? body.innerText.trim() : "";
+            const elements = body.querySelectorAll(
+              "img, canvas, svg, video, iframe, p, div, h1, h2, h3, article, section, main, header"
             );
-          }
-          console.warn("Navigation reached timeout, proceeding with partial DOM state");
-        } else {
-          // Fatal navigation failure (DNS, TLS, connection refused)
-          console.error("Fatal page navigation error:", errStr);
+            return text.length > 20 || elements.length > 2;
+          })
+          .catch(() => false);
+
+        if (!hasContent) {
+          logger.endStage("navigation");
+          logger.fail("NAVIGATION_TIMEOUT", "Page load timed out before usable content rendered", 504);
           return NextResponse.json(
-            { error: "Failed to navigate to target URL. Check that the site is online and reachable." },
-            { status: 502 }
+            { error: "Page load timed out before any usable content could render." },
+            { status: 504 }
           );
         }
+        console.warn("[Capture] Navigation deadline reached, proceeding with partial DOM state");
+      } else {
+        // Fatal navigation failure (DNS, TLS, connection refused)
+        logger.endStage("navigation");
+        logger.fail("NAVIGATION_FAILED", errStr, 502);
+        return NextResponse.json(
+          { error: "Failed to navigate to target URL. Check that the site is online and reachable." },
+          { status: 502 }
+        );
       }
+    }
+    logger.endStage("navigation");
 
-      // Small pause for fonts and responsive CSS to settle
-      await new Promise((r) => setTimeout(r, 600));
+    // 6. Readiness Stage (Fonts & Visible Images)
+    logger.startStage("readiness");
+    const readinessBudget = Math.min(2500, getRemainingBudget(operationStart) - 8000);
 
-      // Trigger lazy-loaded images (IntersectionObserver sweep)
+    try {
+      await page.evaluate(async (maxWaitMs: number) => {
+        const deadline = Date.now() + maxWaitMs;
+
+        // 1. Wait for document fonts if supported
+        if ("fonts" in document && document.fonts.ready) {
+          const fontTimeout = Math.min(800, Math.max(100, deadline - Date.now()));
+          await Promise.race([
+            document.fonts.ready,
+            new Promise((r) => setTimeout(r, fontTimeout)),
+          ]).catch(() => {});
+        }
+
+        // 2. Wait for visible images in the initial viewport
+        const visibleImages = Array.from(document.querySelectorAll("img")).filter((img) => {
+          const rect = img.getBoundingClientRect();
+          return rect.top < window.innerHeight && rect.bottom > 0 && img.src;
+        });
+
+        if (visibleImages.length > 0) {
+          const imgPromises = visibleImages.map((img) => {
+            if (img.complete) return Promise.resolve();
+            return new Promise((resolve) => {
+              img.addEventListener("load", resolve, { once: true });
+              img.addEventListener("error", resolve, { once: true });
+            });
+          });
+          const imgTimeout = Math.min(1000, Math.max(100, deadline - Date.now()));
+          await Promise.race([
+            Promise.all(imgPromises),
+            new Promise((r) => setTimeout(r, imgTimeout)),
+          ]).catch(() => {});
+        }
+      }, readinessBudget);
+    } catch {
+      // Best-effort readiness check
+    }
+
+    // Suppress scrollbars to preserve mockup aesthetics
+    await page.addStyleTag({
+      content: `
+        *::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+        html, body, * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
+      `,
+    }).catch(() => {});
+
+    // Apply zoom if specified
+    if (zoomLevel && zoomLevel !== 100) {
+      await page.evaluate((z) => {
+        (document.documentElement.style as unknown as { zoom: string }).zoom = String(z / 100);
+      }, zoomLevel).catch(() => {});
+    }
+
+    logger.endStage("readiness");
+
+    // 7. Scrolling Stage (Only for full-page captures)
+    if (captureFullPage) {
+      logger.startStage("scrolling");
+      const scrollBudget = Math.min(2000, getRemainingBudget(operationStart) - 6000);
+
       try {
-        await page.evaluate(async () => {
+        await page.evaluate(async (maxDurationMs: number) => {
+          const startTime = Date.now();
+          const distance = 400;
+          const maxScroll = Math.min(document.body.scrollHeight || 2400, 2400);
+          let current = 0;
+
           await new Promise<void>((resolve) => {
-            let current = 0;
-            const distance = 400;
-            const limit = Math.min(document.body.scrollHeight || 2400, 2400);
             const timer = setInterval(() => {
               window.scrollBy(0, distance);
               current += distance;
-              if (current >= limit) {
+              if (current >= maxScroll || Date.now() - startTime >= maxDurationMs) {
                 clearInterval(timer);
                 window.scrollTo(0, 0);
                 resolve();
               }
             }, 60);
           });
-        });
-        await new Promise((r) => setTimeout(r, 400));
+        }, scrollBudget);
       } catch {
         // Fallback if scroll evaluation is interrupted
       }
-
-      // Suppress scrollbars to preserve mockup aesthetics
-      await page.addStyleTag({
-        content: `
-          *::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
-          html, body, * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
-        `,
-      });
-
-      // Apply zoom if specified
-      if (zoomLevel && zoomLevel !== 100) {
-        await page.evaluate((z) => {
-          (document.documentElement.style as unknown as { zoom: string }).zoom = String(z / 100);
-        }, zoomLevel);
-        await new Promise((r) => setTimeout(r, 400));
-      }
-
-      // Capture screenshot
-      const base64Buffer = await page.screenshot({
-        type: "png",
-        fullPage: captureFullPage,
-        encoding: "base64",
-      });
-
-      const fullPageHeight = await page
-        .evaluate(() => Math.max(document.body.scrollHeight, document.documentElement.scrollHeight))
-        .catch(() => emulatedHeight);
-
-      return NextResponse.json({
-        success: true,
-        screenshotBase64: `data:image/png;base64,${base64Buffer}`,
-        width: deviceWidth,
-        height: emulatedHeight,
-        fullHeight: fullPageHeight,
-        deviceScaleFactor,
-      });
-    } finally {
-      if (browser) await browser.close().catch(() => {});
-      if (tempUserDataDir) {
-        fs.rm(tempUserDataDir, { recursive: true, force: true }, () => {});
-      }
+      logger.endStage("scrolling");
     }
+
+    // 8. Screenshot Encoding Stage
+    logger.startStage("screenshot_encode");
+
+    // Measure full-page height and check oversized bounds
+    const fullPageHeight = await page
+      .evaluate(() => Math.max(document.body.scrollHeight, document.documentElement.scrollHeight))
+      .catch(() => emulatedHeight);
+
+    const effectiveHeight = captureFullPage ? fullPageHeight : emulatedHeight;
+    const totalPixels = deviceWidth * effectiveHeight * (deviceScaleFactor * deviceScaleFactor);
+
+    if (totalPixels > MAX_TOTAL_PIXELS || (captureFullPage && fullPageHeight > MAX_FULL_PAGE_HEIGHT)) {
+      logger.endStage("screenshot_encode");
+      logger.fail(
+        "OVERSIZED_CAPTURE",
+        `Requested capture exceeds maximum allowable size (${deviceWidth} × ${effectiveHeight} px, ${Math.round(totalPixels / 1_000_000)}M px)`,
+        400
+      );
+      return NextResponse.json(
+        {
+          error: `Capture exceeds maximum allowable dimensions (${deviceWidth} × ${effectiveHeight} px). Please reduce dimensions or capture visible viewport only.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const base64Buffer = await page.screenshot({
+      type: "png",
+      fullPage: captureFullPage,
+      encoding: "base64",
+    });
+
+    logger.endStage("screenshot_encode");
+
+    // 9. Response Preparation Stage
+    logger.startStage("response_prep");
+    const payloadSizeBytes = base64Buffer.length;
+
+    logger.complete({
+      width: deviceWidth,
+      height: emulatedHeight,
+      fullHeight: fullPageHeight,
+      deviceScaleFactor,
+      payloadSizeBytes,
+    });
+    logger.endStage("response_prep");
+
+    const response = NextResponse.json({
+      success: true,
+      screenshotBase64: `data:image/png;base64,${base64Buffer}`,
+      width: deviceWidth,
+      height: emulatedHeight,
+      fullHeight: fullPageHeight,
+      deviceScaleFactor,
+    });
+
+    response.headers.set("Cache-Control", "private, no-store, no-cache, must-revalidate");
+    return response;
   } catch (err: unknown) {
-    console.error("Screenshot error:", err);
+    const errStr = err instanceof Error ? err.message : String(err);
+    const isTimeout =
+      (err instanceof Error && err.name === "TimeoutError") ||
+      errStr.toLowerCase().includes("timeout") ||
+      Date.now() - operationStart >= TOTAL_OPERATION_BUDGET_MS;
+
+    const classification: FailureClassification = isTimeout
+      ? "EXECUTION_TIMEOUT"
+      : "INTERNAL_ERROR";
+    const statusCode = isTimeout ? 504 : 500;
+
+    if (logger) {
+      logger.fail(classification, err, statusCode);
+    } else {
+      console.error("[Capture] Unhandled error before logger initialization:", err);
+    }
+
     return NextResponse.json(
-      { error: "Screenshot generation failed. Please check the URL or try again later." },
-      { status: 500 }
+      {
+        error: isTimeout
+          ? "Screenshot operation timed out. The website took too long to load or capture."
+          : "Screenshot generation failed. Please check the URL or try again later.",
+      },
+      { status: statusCode }
     );
+  } finally {
+    // 10. Cleanup Stage
+    try {
+      if (page) {
+        await page.close().catch(() => {});
+      }
+      if (context) {
+        await context.close().catch(() => {});
+      }
+      if (browser) {
+        if (isRemote) {
+          await browser.disconnect().catch(() => {});
+        } else {
+          await browser.close().catch(() => {});
+        }
+      } else {
+        const pendingLaunch = inFlightLaunch as Promise<Browser> | null;
+        if (pendingLaunch) {
+          // Late-resolving launch safety
+          pendingLaunch.then((b: Browser) => {
+            if (isRemote) b.disconnect().catch(() => {});
+            else b.close().catch(() => {});
+          }).catch(() => {});
+        }
+      }
+
+      if (tempUserDataDir) {
+        fs.promises.rm(tempUserDataDir, { recursive: true, force: true }).catch(() => {});
+      }
+    } catch {
+      // Suppress cleanup errors
+    }
   }
 }

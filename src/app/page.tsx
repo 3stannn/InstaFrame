@@ -45,9 +45,26 @@ export default function Home() {
   }, []);
 
   const showToast = useCallback(
-    (message: string, type: "success" | "error" | "info" = "info") => {
-      const id = `${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
-      setToasts((prev) => [...prev, { id, message, type }]);
+    (
+      message: string,
+      type: "success" | "error" | "info" = "info",
+      options?: { id?: string; duration?: number }
+    ): string => {
+      const id = options?.id || `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      const duration = options?.duration;
+
+      setToasts((prev) => {
+        // Dismiss in-flight info/progress toasts when error or success is shown
+        let filtered = prev;
+        if (type === "error" || type === "success") {
+          filtered = prev.filter((t) => t.type !== "info" && t.id !== id);
+        } else {
+          filtered = prev.filter((t) => t.id !== id);
+        }
+        return [...filtered, { id, message, type, duration }];
+      });
+
+      return id;
     },
     []
   );

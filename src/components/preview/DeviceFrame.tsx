@@ -416,7 +416,11 @@ export function DeviceFrame({
                     width: `${device.width}px`,
                     height: `${device.height}px`,
                   }}
-                  sandbox="allow-scripts allow-forms allow-popups allow-same-origin"
+                  sandbox={
+                    isProxied
+                      ? "allow-scripts allow-forms allow-popups"
+                      : "allow-scripts allow-forms allow-popups allow-same-origin"
+                  }
                   onLoad={handleIframeLoad}
                 />
               ) : (

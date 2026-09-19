@@ -84,6 +84,12 @@ export async function GET(request: NextRequest) {
         ""
       );
 
+      // Strip common local development hot-reload and live-reload scripts to prevent WebSocket errors
+      html = html.replace(
+        /<script[^>]*src=["'][^"']*(?:@vite\/client|livereload\.js|webpack-dev-server)[^"']*["'][^>]*><\/script>/gi,
+        ""
+      );
+
       // Resolve root-relative srcset attributes to absolute URLs
       html = html.replace(
         /(srcset=["'])([^"']+)(["'])/gi,
@@ -114,7 +120,7 @@ export async function GET(request: NextRequest) {
       // 1. Mobile scrollbar suppression
       // 2. Comprehensive lazy-image hydration (swapping data-src, data-lazy-src, data-original)
       // 3. Scroll & resize listener to trigger IntersectionObservers
-      // 4. Safe fetch and XHR proxy interception
+      // 4. Safe fetch and XHR proxy interception (GET/HEAD only to avoid 405s)
       // 5. Intra-frame navigation interception
       // 6. Scroll sync and frame readiness announcement
       const injectedScript = `
@@ -175,11 +181,15 @@ export async function GET(request: NextRequest) {
             setTimeout(hydrateLazyImages, 500);
             setTimeout(hydrateLazyImages, 1500);
 
-            // 3. Intercept fetch to route background requests
+            // 3. Intercept fetch to route background GET/HEAD requests only (prevents 405 on POST)
             var _origFetch = window.fetch;
             if (_origFetch) {
               window.fetch = function(resource, init) {
                 try {
+                  var method = (init && init.method ? init.method : 'GET').toUpperCase();
+                  if (method !== 'GET' && method !== 'HEAD') {
+                    return _origFetch.apply(this, arguments);
+                  }
                   var urlStr = null;
                   if (typeof resource === 'string') {
                     urlStr = resource;
@@ -200,15 +210,18 @@ export async function GET(request: NextRequest) {
               };
             }
 
-            // 4. Intercept XMLHttpRequest
+            // 4. Intercept XMLHttpRequest for GET/HEAD only
             var _origOpen = XMLHttpRequest.prototype.open;
             XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
               try {
-                if (typeof url === 'string' && !url.startsWith('data:') && !url.startsWith('blob:')) {
-                  var resolved = new URL(url, targetBase).toString();
-                  if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
-                    if (!resolved.includes('/api/proxy?url=')) {
-                      arguments[1] = proxyEndpoint + '?url=' + encodeURIComponent(resolved);
+                var m = (method || 'GET').toUpperCase();
+                if (m === 'GET' || m === 'HEAD') {
+                  if (typeof url === 'string' && !url.startsWith('data:') && !url.startsWith('blob:')) {
+                    var resolved = new URL(url, targetBase).toString();
+                    if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
+                      if (!resolved.includes('/api/proxy?url=')) {
+                        arguments[1] = proxyEndpoint + '?url=' + encodeURIComponent(resolved);
+                      }
                     }
                   }
                 }

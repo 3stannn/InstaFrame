@@ -35,10 +35,16 @@ interface DeviceSnapshot {
   fullHeight?: number;
 }
 
+import { executeScreenshotCapture } from "@/lib/capture-client";
+
 interface ResponsiveStudioProps {
   initialUrl?: string;
   onUrlChange?: (url: string) => void;
-  onShowToast: (message: string, type: "success" | "error" | "info") => void;
+  onShowToast: (
+    message: string,
+    type?: "success" | "error" | "info",
+    options?: { id?: string; duration?: number }
+  ) => string | void;
   onSendToMockup?: (
     url: string,
     presetKey: string,
@@ -227,25 +233,21 @@ export function ResponsiveStudio({
       if (!target) return null;
       setSnapshotLoading((prev) => ({ ...prev, [device.id]: true }));
       try {
-        const res = await fetch("/api/screenshot", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            url: target,
-            presetKey: device.presetKey,
-            customW: device.width,
-            customH: device.height,
-            captureFullPage: true,
-          }),
+        const result = await executeScreenshotCapture({
+          url: target,
+          presetKey: device.presetKey,
+          customW: device.width,
+          customH: device.height,
+          captureFullPage: true,
+          captureQuality: "preview",
         });
 
-        const data = await res.json();
-        if (res.ok && data.screenshotBase64) {
+        if (result.success && result.data) {
           const snap: DeviceSnapshot = {
-            dataUrl: data.screenshotBase64,
-            width: data.width,
-            height: data.height,
-            fullHeight: data.fullHeight,
+            dataUrl: result.data.screenshotBase64,
+            width: result.data.width,
+            height: result.data.height,
+            fullHeight: result.data.fullHeight,
           };
           setSnapshots((prev) => ({
             ...prev,
@@ -253,7 +255,8 @@ export function ResponsiveStudio({
           }));
           return snap;
         } else {
-          throw new Error(data.error || `Server returned status ${res.status}`);
+          onShowToast(`Capture failed: ${result.error || "Server error"}`, "error");
+          return null;
         }
       } catch (err: unknown) {
         console.warn("Snapshot error:", err);
@@ -267,13 +270,13 @@ export function ResponsiveStudio({
     [onShowToast]
   );
 
-  // Capture snapshots for all active devices
+  // Capture snapshots for all active devices sequentially to avoid overwhelming browser
   const captureAllSnapshots = useCallback(
-    (target: string, devicesToCapture = activeDevices) => {
+    async (target: string, devicesToCapture = activeDevices) => {
       if (!target) return;
-      devicesToCapture.forEach((device) => {
-        captureDeviceSnapshot(device, target);
-      });
+      for (const device of devicesToCapture) {
+        await captureDeviceSnapshot(device, target);
+      }
     },
     [activeDevices, captureDeviceSnapshot]
   );

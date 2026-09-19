@@ -29,11 +29,16 @@ import {
 import { renderMockup, FitMode } from "@/lib/compositor";
 import { loadSettings, saveSettings } from "@/lib/storage";
 import { CustomDropdown, DropdownItem } from "@/components/CustomDropdown";
+import { executeScreenshotCapture } from "@/lib/capture-client";
 
 interface MockupStudioProps {
   isPro: boolean;
   onOpenLicense: () => void;
-  onShowToast: (message: string, type: "success" | "error" | "info") => void;
+  onShowToast: (
+    message: string,
+    type?: "success" | "error" | "info",
+    options?: { id?: string; duration?: number }
+  ) => string | void;
   isActive?: boolean;
   initialConfig?: {
     url?: string;
@@ -73,8 +78,8 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
   const [isDragging, setIsDragging] = useState(false);
   const [dragOrigin, setDragOrigin] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeCaptureAbortRef = useRef<AbortController | null>(null);
 
   // Restore saved preferences
   useEffect(() => {
@@ -97,7 +102,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
     if (saved.fitMode) setFitMode(saved.fitMode);
   }, []);
 
-  // Initialize crisp preview canvas immediately on mount so mockup is active on open
+  // Initialize placeholder preview canvas on mount (clearly labeled as not yet captured)
   useEffect(() => {
     if (!screenshotDataUrl && !isCapturing) {
       const canvas = document.createElement("canvas");
@@ -140,21 +145,21 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
         } else {
           ctx.fillRect(240, 123, 440, 24);
         }
-        ctx.fillStyle = "#a1a1aa";
+        ctx.fillStyle = "#71717a";
         ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-        ctx.fillText("https://yourwebsite.com", 256, 139);
+        ctx.fillText("Enter URL above to capture", 256, 139);
 
         // Content
         ctx.fillStyle = "#f4f4f5";
         ctx.font = "bold 34px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-        ctx.fillText("Active Device Mockup Preview", 200, 280);
+        ctx.fillText("Not Yet Captured", 200, 280);
 
         ctx.fillStyle = "#a1a1aa";
         ctx.font = "16px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-        ctx.fillText("High-fidelity responsive viewport emulation and pixel-accurate framing.", 200, 325);
+        ctx.fillText("Enter a website URL above and click Capture to generate a responsive preview.", 200, 325);
 
         // Action CTA pill
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = "#27272a";
         if (typeof ctx.roundRect === "function") {
           ctx.beginPath();
           ctx.roundRect(200, 380, 180, 42, 8);
@@ -163,9 +168,9 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
           ctx.fillRect(200, 380, 180, 42);
         }
 
-        ctx.fillStyle = "#09090b";
+        ctx.fillStyle = "#a1a1aa";
         ctx.font = "bold 13.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-        ctx.fillText("Active & Ready", 240, 406);
+        ctx.fillText("Awaiting Capture", 240, 406);
 
         const initialData = canvas.toDataURL("image/png");
         setScreenshotDataUrl(initialData);
@@ -285,37 +290,59 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
     const zoomToUse = overrideZoom !== undefined ? overrideZoom : selectedZoom;
 
     saveSettings({ targetUrl: target, preset: presetToUse, frame: frameToUse, zoom: zoomToUse });
+
+    // Cancel in-flight capture to avoid stale responses
+    if (activeCaptureAbortRef.current) {
+      activeCaptureAbortRef.current.abort();
+    }
+    const abortController = new AbortController();
+    activeCaptureAbortRef.current = abortController;
+
     setIsCapturing(true);
-    onShowToast(`Emulating ${presetToUse} viewport at ${zoomToUse}% zoom...`, "info");
+    const progressId = onShowToast(
+      `Emulating ${presetToUse} viewport at ${zoomToUse}% zoom...`,
+      "info",
+      { duration: 0 }
+    );
 
     try {
-      const res = await fetch("/api/screenshot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: target,
-          presetKey: presetToUse,
-          customW,
-          customH,
-          frameId: frameToUse,
-          zoomLevel: parseInt(zoomToUse, 10) || 100,
-          captureFullPage: fullPage,
-        }),
+      const result = await executeScreenshotCapture({
+        url: target,
+        presetKey: presetToUse,
+        customW,
+        customH,
+        frameId: frameToUse,
+        zoomLevel: parseInt(zoomToUse, 10) || 100,
+        captureFullPage: fullPage,
+        captureQuality: "preview",
+        signal: abortController.signal,
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.screenshotBase64) {
-        throw new Error(data.error || `Server returned status ${res.status}`);
+      if (abortController.signal.aborted) {
+        return; // Request was superseded
       }
 
-      setScreenshotDataUrl(data.screenshotBase64);
-      setCaptureSource("url");
-      setCapturedPreset(presetToUse);
-      onShowToast(`Rendered responsive ${data.width} × ${data.height} layout at ${zoomToUse}% zoom!`, "success");
+      if (result.success && result.data) {
+        setScreenshotDataUrl(result.data.screenshotBase64);
+        setCaptureSource("url");
+        setCapturedPreset(presetToUse);
+        const kb = Math.round(result.payloadSizeBytes / 1024);
+        onShowToast(
+          `Rendered responsive ${result.data.width} × ${result.data.height} layout (${kb} KB in ${result.transferTimeMs}ms)${result.fromCache ? " [cached]" : ""}!`,
+          "success",
+          progressId ? { id: progressId } : undefined
+        );
+      } else {
+        onShowToast(
+          `Capture failed: ${result.error || "Unknown error"}`,
+          "error",
+          progressId ? { id: progressId } : undefined
+        );
+      }
     } catch (err: unknown) {
       console.error("Capture failed:", err);
       const msg = err instanceof Error ? err.message : "Network error";
-      onShowToast(`Capture failed: ${msg}`, "error");
+      onShowToast(`Capture failed: ${msg}`, "error", progressId ? { id: progressId } : undefined);
     } finally {
       setIsCapturing(false);
     }

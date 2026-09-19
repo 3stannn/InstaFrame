@@ -3,9 +3,11 @@ import puppeteer from "puppeteer-core";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import net from "net";
 import { DEVICE_PRESETS } from "@/lib/devices";
-import { validateUrlSafe } from "@/lib/ssrf";
+import { validateUrlSafe, isPrivateOrBlockedIP } from "@/lib/ssrf";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -115,14 +117,36 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const wsEndpoint = process.env.BROWSERLESS_URL || process.env.PUPPETEER_WS_ENDPOINT;
+    // Prioritize PUPPETEER_WS_ENDPOINT if set, falling back to BROWSERLESS_URL
+    const wsEndpoint = (
+      process.env.PUPPETEER_WS_ENDPOINT ||
+      process.env.BROWSERLESS_URL ||
+      ""
+    ).trim();
     let browser: Awaited<ReturnType<typeof puppeteer.launch>>;
     let tempUserDataDir: string | null = null;
 
     if (wsEndpoint) {
-      browser = await puppeteer.connect({
-        browserWSEndpoint: wsEndpoint,
-      });
+      if (!/^wss?:\/\//i.test(wsEndpoint)) {
+        console.error("Invalid remote browser WebSocket URL scheme");
+        return NextResponse.json(
+          { error: "Remote browser endpoint must use ws:// or wss:// scheme" },
+          { status: 500 }
+        );
+      }
+
+      try {
+        browser = await puppeteer.connect({
+          browserWSEndpoint: wsEndpoint,
+          protocolTimeout: 30000,
+        });
+      } catch (connectErr: unknown) {
+        console.error("Failed to connect to remote browser endpoint:", connectErr);
+        return NextResponse.json(
+          { error: "Failed to connect to remote browser endpoint. Please verify configuration and provider status." },
+          { status: 502 }
+        );
+      }
     } else {
       const localPath = getLocalChromePath();
 
@@ -182,13 +206,11 @@ export async function POST(request: NextRequest) {
             args: chromium.args,
           });
         } catch (serverlessErr: unknown) {
-          const detail =
-            serverlessErr instanceof Error ? serverlessErr.message : String(serverlessErr);
           console.error("Failed to launch serverless chromium:", serverlessErr);
           return NextResponse.json(
             {
-              error: `Could not launch browser in this environment: ${detail}. For custom cloud hosting, set BROWSERLESS_URL or PUPPETEER_WS_ENDPOINT in your environment variables.`,
-              detail,
+              error:
+                "Could not launch browser in this environment. For custom cloud hosting, set PUPPETEER_WS_ENDPOINT or BROWSERLESS_URL in your environment variables.",
             },
             { status: 500 }
           );
@@ -212,14 +234,69 @@ export async function POST(request: NextRequest) {
         await page.setUserAgent(userAgent);
       }
 
+      // Intercept network requests for redirect & subresource SSRF defense
+      await page.setRequestInterception(true);
+      page.on("request", (req) => {
+        const reqUrl = req.url();
+        try {
+          const parsed = new URL(reqUrl);
+          const proto = parsed.protocol.toLowerCase();
+          if (proto !== "http:" && proto !== "https:" && proto !== "data:" && proto !== "blob:") {
+            req.abort("blockedbyclient");
+            return;
+          }
+          const host = parsed.hostname.toLowerCase();
+          if (
+            host === "localhost" ||
+            host.endsWith(".localhost") ||
+            host.endsWith(".local") ||
+            host.endsWith(".internal") ||
+            host === "metadata.google.internal" ||
+            host === "instance-data" ||
+            (net.isIP(host) && isPrivateOrBlockedIP(host))
+          ) {
+            req.abort("blockedbyclient");
+            return;
+          }
+          req.continue();
+        } catch {
+          req.abort("blockedbyclient");
+        }
+      });
+
       // Navigate to target URL on its real origin
       try {
         await page.goto(targetUrl, {
           waitUntil: "domcontentloaded",
           timeout: 16000,
         });
-      } catch (navErr) {
-        console.warn("Navigation reached timeout, proceeding with current DOM state:", navErr);
+      } catch (navErr: unknown) {
+        const errStr = navErr instanceof Error ? navErr.message : String(navErr);
+        const isTimeout =
+          (navErr instanceof Error && navErr.name === "TimeoutError") ||
+          errStr.toLowerCase().includes("timeout");
+
+        if (isTimeout) {
+          // Verify if usable content rendered before proceeding
+          const hasContent = await page
+            .evaluate(() => Boolean(document.body && document.body.children.length > 0))
+            .catch(() => false);
+
+          if (!hasContent) {
+            return NextResponse.json(
+              { error: "Page load timed out before any usable content could render." },
+              { status: 504 }
+            );
+          }
+          console.warn("Navigation reached timeout, proceeding with partial DOM state");
+        } else {
+          // Fatal navigation failure (DNS, TLS, connection refused)
+          console.error("Fatal page navigation error:", errStr);
+          return NextResponse.json(
+            { error: "Failed to navigate to target URL. Check that the site is online and reachable." },
+            { status: 502 }
+          );
+        }
       }
 
       // Small pause for fonts and responsive CSS to settle
@@ -291,9 +368,8 @@ export async function POST(request: NextRequest) {
     }
   } catch (err: unknown) {
     console.error("Screenshot error:", err);
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json(
-      { error: `Screenshot failed: ${errorMessage}` },
+      { error: "Screenshot generation failed. Please check the URL or try again later." },
       { status: 500 }
     );
   }

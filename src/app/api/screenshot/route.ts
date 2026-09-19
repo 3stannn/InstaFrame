@@ -9,21 +9,34 @@ import { validateUrlSafe } from "@/lib/ssrf";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function getChromePath(): string {
+function getLocalChromePath(): string | null {
+  const localAppData = process.env.LOCALAPPDATA || "";
+  const programFiles = process.env.ProgramFiles || "C:\\Program Files";
+  const programFilesX86 = process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)";
+
   const possiblePaths = [
     process.env.CHROME_PATH,
-    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-    "C:\\Users\\dave\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe",
+    path.join(programFiles, "Google", "Chrome", "Application", "chrome.exe"),
+    path.join(programFilesX86, "Google", "Chrome", "Application", "chrome.exe"),
+    localAppData ? path.join(localAppData, "Google", "Chrome", "Application", "chrome.exe") : null,
+    path.join(programFilesX86, "Microsoft", "Edge", "Application", "msedge.exe"),
+    path.join(programFiles, "Microsoft", "Edge", "Application", "msedge.exe"),
+    localAppData ? path.join(localAppData, "Microsoft", "Edge", "Application", "msedge.exe") : null,
+    path.join(programFiles, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
+    localAppData ? path.join(localAppData, "BraveSoftware", "Brave-Browser", "Application", "brave.exe") : null,
     "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
     "/usr/bin/chromium-browser",
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
   ].filter(Boolean) as string[];
 
   for (const p of possiblePaths) {
     if (fs.existsSync(p)) return p;
   }
-  return "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+  return null;
 }
 
 export async function POST(request: NextRequest) {
@@ -111,47 +124,73 @@ export async function POST(request: NextRequest) {
         browserWSEndpoint: wsEndpoint,
       });
     } else {
-      const executablePath = getChromePath();
-      if (!fs.existsSync(executablePath)) {
-        return NextResponse.json(
-          {
-            error:
-              "Chrome executable not found on host. For Vercel or serverless deployments, configure BROWSERLESS_URL or PUPPETEER_WS_ENDPOINT in your environment variables.",
-          },
-          { status: 500 }
-        );
+      const localPath = getLocalChromePath();
+
+      if (localPath) {
+        // Local desktop browser (Chrome, Edge, Brave)
+        const uniqueProfileId = `instaframe_prof_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        tempUserDataDir = path.join(os.tmpdir(), uniqueProfileId);
+
+        browser = await puppeteer.launch({
+          executablePath: localPath,
+          headless: true,
+          userDataDir: tempUserDataDir,
+          args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-gpu",
+            "--disable-dev-shm-usage",
+            "--disable-background-networking",
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-breakpad",
+            "--disable-client-side-phishing-detection",
+            "--disable-default-apps",
+            "--disable-extensions",
+            "--disable-hang-monitor",
+            "--disable-popup-blocking",
+            "--disable-prompt-on-repost",
+            "--disable-sync",
+            "--metrics-recording-only",
+            "--no-first-run",
+            "--safebrowsing-disable-auto-update",
+            `--window-size=${deviceWidth},${emulatedHeight}`,
+          ],
+        });
+      } else {
+        // Serverless environment (e.g. Vercel / AWS Lambda) via @sparticuz/chromium
+        try {
+          const chromium = (await import("@sparticuz/chromium")).default;
+          const executablePath = await chromium.executablePath();
+
+          browser = await puppeteer.launch({
+            executablePath,
+            headless: true,
+            defaultViewport: {
+              width: deviceWidth,
+              height: emulatedHeight,
+              deviceScaleFactor,
+            },
+            args: [
+              ...chromium.args,
+              "--disable-gpu",
+              "--disable-dev-shm-usage",
+              "--disable-setuid-sandbox",
+              "--no-sandbox",
+              "--no-zygote",
+            ],
+          });
+        } catch (serverlessErr) {
+          console.error("Failed to launch serverless chromium:", serverlessErr);
+          return NextResponse.json(
+            {
+              error:
+                "Could not launch browser in this environment. For custom cloud hosting, set BROWSERLESS_URL or PUPPETEER_WS_ENDPOINT in your environment variables.",
+            },
+            { status: 500 }
+          );
+        }
       }
-
-      // Isolate browser profile per capture session to prevent Windows Chrome lockups
-      const uniqueProfileId = `instaframe_prof_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      tempUserDataDir = path.join(os.tmpdir(), uniqueProfileId);
-
-      browser = await puppeteer.launch({
-        executablePath,
-        headless: true,
-        userDataDir: tempUserDataDir,
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-gpu",
-          "--disable-dev-shm-usage",
-          "--disable-background-networking",
-          "--disable-background-timer-throttling",
-          "--disable-backgrounding-occluded-windows",
-          "--disable-breakpad",
-          "--disable-client-side-phishing-detection",
-          "--disable-default-apps",
-          "--disable-extensions",
-          "--disable-hang-monitor",
-          "--disable-popup-blocking",
-          "--disable-prompt-on-repost",
-          "--disable-sync",
-          "--metrics-recording-only",
-          "--no-first-run",
-          "--safebrowsing-disable-auto-update",
-          `--window-size=${deviceWidth},${emulatedHeight}`,
-        ],
-      });
     }
 
     try {

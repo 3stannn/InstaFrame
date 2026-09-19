@@ -223,8 +223,8 @@ export function ResponsiveStudio({
 
   // Fetch isolated snapshot for a single device (for capture or snapshot fallback)
   const captureDeviceSnapshot = useCallback(
-    async (device: DeviceFrameDevice, target: string) => {
-      if (!target) return;
+    async (device: DeviceFrameDevice, target: string): Promise<DeviceSnapshot | null> => {
+      if (!target) return null;
       setSnapshotLoading((prev) => ({ ...prev, [device.id]: true }));
       try {
         const res = await fetch("/api/screenshot", {
@@ -241,23 +241,30 @@ export function ResponsiveStudio({
 
         const data = await res.json();
         if (res.ok && data.screenshotBase64) {
+          const snap: DeviceSnapshot = {
+            dataUrl: data.screenshotBase64,
+            width: data.width,
+            height: data.height,
+            fullHeight: data.fullHeight,
+          };
           setSnapshots((prev) => ({
             ...prev,
-            [device.id]: {
-              dataUrl: data.screenshotBase64,
-              width: data.width,
-              height: data.height,
-              fullHeight: data.fullHeight,
-            },
+            [device.id]: snap,
           }));
+          return snap;
+        } else {
+          throw new Error(data.error || `Server returned status ${res.status}`);
         }
       } catch (err: unknown) {
         console.warn("Snapshot error:", err);
+        const msg = err instanceof Error ? err.message : "Capture failed";
+        onShowToast(`Capture failed: ${msg}`, "error");
+        return null;
       } finally {
         setSnapshotLoading((prev) => ({ ...prev, [device.id]: false }));
       }
     },
-    []
+    [onShowToast]
   );
 
   // Capture snapshots for all active devices
@@ -507,15 +514,18 @@ export function ResponsiveStudio({
     const device = activeDevices.find((d) => d.id === deviceId);
     if (!device) return;
 
-    let snapshot = snapshots[deviceId];
+    if (!activeUrl) {
+      onShowToast("Please enter a website URL first.", "error");
+      return;
+    }
+
+    let snapshot: DeviceSnapshot | undefined | null = snapshots[deviceId];
     if (!snapshot?.dataUrl) {
       onShowToast("Generating capture snapshot. Please wait...", "info");
-      await captureDeviceSnapshot(device, activeUrl);
-      snapshot = snapshots[deviceId];
+      snapshot = await captureDeviceSnapshot(device, activeUrl);
     }
 
     if (!snapshot?.dataUrl) {
-      onShowToast("Snapshot generation timed out. Please try again.", "error");
       return;
     }
 

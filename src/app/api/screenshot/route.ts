@@ -161,31 +161,34 @@ export async function POST(request: NextRequest) {
         // Serverless environment (e.g. Vercel / AWS Lambda) via @sparticuz/chromium
         try {
           const chromium = (await import("@sparticuz/chromium")).default;
-          const executablePath = await chromium.executablePath();
+          let executablePath: string;
+          try {
+            executablePath = await chromium.executablePath();
+          } catch (binErr) {
+            console.warn("Local chromium bin missing, downloading pack fallback:", binErr);
+            executablePath = await chromium.executablePath(
+              "https://github.com/Sparticuz/chromium/releases/download/v153.0.0/chromium-v153.0.0-pack.tar"
+            );
+          }
 
           browser = await puppeteer.launch({
             executablePath,
-            headless: true,
+            headless: "shell",
             defaultViewport: {
               width: deviceWidth,
               height: emulatedHeight,
               deviceScaleFactor,
             },
-            args: [
-              ...chromium.args,
-              "--disable-gpu",
-              "--disable-dev-shm-usage",
-              "--disable-setuid-sandbox",
-              "--no-sandbox",
-              "--no-zygote",
-            ],
+            args: chromium.args,
           });
-        } catch (serverlessErr) {
+        } catch (serverlessErr: unknown) {
+          const detail =
+            serverlessErr instanceof Error ? serverlessErr.message : String(serverlessErr);
           console.error("Failed to launch serverless chromium:", serverlessErr);
           return NextResponse.json(
             {
-              error:
-                "Could not launch browser in this environment. For custom cloud hosting, set BROWSERLESS_URL or PUPPETEER_WS_ENDPOINT in your environment variables.",
+              error: `Could not launch browser in this environment: ${detail}. For custom cloud hosting, set BROWSERLESS_URL or PUPPETEER_WS_ENDPOINT in your environment variables.`,
+              detail,
             },
             { status: 500 }
           );

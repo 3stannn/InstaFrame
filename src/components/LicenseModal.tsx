@@ -21,6 +21,7 @@ export function LicenseModal({
 }: LicenseModalProps) {
   const [keyInput, setKeyInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
 
   if (!isOpen) return null;
 
@@ -42,17 +43,26 @@ export function LicenseModal({
       onStatusChange(true);
       setKeyInput("");
       onClose();
-    } catch (err: any) {
-      onShowToast(err.message || "Failed to activate license.", "error");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to activate license.";
+      onShowToast(message, "error");
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeactivate = async () => {
-    await deactivateLicense();
-    onStatusChange(false);
-    onShowToast("License deactivated.", "info");
+    setDeactivating(true);
+    try {
+      await deactivateLicense();
+      onStatusChange(false);
+      onShowToast("License deactivated.", "info");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to deactivate license.";
+      onShowToast(message, "error");
+    } finally {
+      setDeactivating(false);
+    }
   };
 
   return (
@@ -99,9 +109,10 @@ export function LicenseModal({
               <button
                 type="button"
                 onClick={handleDeactivate}
-                className="w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+                disabled={deactivating}
+                className="w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white disabled:opacity-50"
               >
-                Deactivate License
+                {deactivating ? "Deactivating..." : "Deactivate License"}
               </button>
             </div>
           ) : (

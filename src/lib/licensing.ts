@@ -46,9 +46,28 @@ export async function getOrSetInstanceId(): Promise<string> {
   return instanceId;
 }
 
+const UUID_V4_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export async function checkProStatus(): Promise<boolean> {
   const data = getStoredLicense();
   if (!data.isPro || !data.licenseKey) return false;
+
+  const isDemo =
+    data.licenseKey === "POLAR_PRO_DEMO" || data.licenseKey.startsWith("POLAR_TEST_");
+
+  // If this client was previously granted Pro via the old fallback without a real Polar UUID,
+  // automatically upgrade and register the activation with Polar now.
+  if (!isDemo && (!data.activationId || !UUID_V4_REGEX.test(data.activationId))) {
+    try {
+      await activateLicense(data.licenseKey);
+      return true;
+    } catch (err) {
+      console.warn("Legacy license activation upgrade failed:", err);
+      saveStoredLicense({ isPro: false, lastVerified: Date.now() });
+      return false;
+    }
+  }
 
   // Cached verification window (fast startup)
   if (data.lastVerified && Date.now() - data.lastVerified < DAY_MS) {
@@ -66,7 +85,7 @@ export async function checkProStatus(): Promise<boolean> {
         activationId: data.activationId
       })
     });
-    const result = await res.json();
+    const result = await res.json().catch(() => ({}));
     const active = res.ok && result.valid === true;
 
     saveStoredLicense({ isPro: active, lastVerified: Date.now() });
@@ -96,8 +115,9 @@ export async function activateLicense(licenseKey: string): Promise<boolean> {
         instanceId
       })
     });
-  } catch (err: any) {
-    throw new Error(`Connection to license server failed: ${err.message}`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    throw new Error(`Connection to license server failed: ${message}`);
   }
 
   const body = await res.json().catch(() => ({}));
@@ -121,6 +141,23 @@ export async function activateLicense(licenseKey: string): Promise<boolean> {
 
 export async function deactivateLicense(): Promise<boolean> {
   if (typeof window === "undefined") return true;
+  const data = getStoredLicense();
+  if (data.licenseKey && data.activationId) {
+    try {
+      await fetch("/api/license", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "deactivate",
+          key: data.licenseKey,
+          activationId: data.activationId
+        })
+      });
+    } catch (err) {
+      console.warn("Failed to deactivate on server:", err);
+    }
+  }
   window.localStorage.removeItem(STORAGE_KEY);
   return true;
 }
+

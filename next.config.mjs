@@ -1,8 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Keep production builds separate from a running development preview.
-  distDir: process.env.NODE_ENV === "development" ? ".next" : ".next-production",
+  // Vercel's Next.js adapter expects .next. Isolate only local production builds
+  // so they do not overwrite a development preview running in the workspace.
+  distDir: process.env.VERCEL === "1" || process.env.NODE_ENV === "development"
+    ? ".next"
+    : ".next-production",
   images: {
     unoptimized: true,
   },

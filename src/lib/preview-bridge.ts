@@ -113,10 +113,24 @@ export function isValidBridgeMessage(data: unknown): data is BridgeMessage {
     return false;
   }
 
-  if (typeof msg.timestamp !== "number" || isNaN(msg.timestamp)) {
+  if (typeof msg.timestamp !== "number" || !Number.isFinite(msg.timestamp)) {
     return false;
   }
 
+  const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+  if (msg.type === "PREVIEW_SCROLL_UPDATE" || msg.type === "PREVIEW_SCROLL_APPLY") {
+    return finite(msg.scrollX) && finite(msg.scrollY) && finite(msg.ratioX) && finite(msg.ratioY)
+      && (msg.mode === "ratio" || msg.mode === "pixels");
+  }
+  if (msg.type === "PREVIEW_NAVIGATED") return typeof msg.url === "string" && typeof msg.title === "string";
+  if (msg.type === "PREVIEW_HANDSHAKE_ACK") {
+    const capabilities = msg.capabilitiesGranted as Record<string, unknown> | undefined;
+    const maxScroll = msg.maxScroll as Record<string, unknown> | undefined;
+    return typeof msg.url === "string" && typeof msg.title === "string" && Boolean(capabilities && maxScroll)
+      && ["scroll", "navigation", "click", "input"].every((key) => typeof capabilities?.[key] === "boolean")
+      && finite(maxScroll?.x) && finite(maxScroll?.y);
+  }
+  if (msg.type === "PREVIEW_HANDSHAKE_INIT") return typeof msg.viewerOrigin === "string" && Array.isArray(msg.capabilitiesRequested);
   return true;
 }
 
@@ -204,6 +218,7 @@ export function initTargetBridge(options: BridgeOptions = {}): () => void {
 
     // Handshake
     if (msg.type === "PREVIEW_HANDSHAKE_INIT") {
+      if (event.source !== window.parent) return;
       const initMsg = msg as HandshakeInitMessage;
       const origin = event.origin.toLowerCase();
 
@@ -240,7 +255,7 @@ export function initTargetBridge(options: BridgeOptions = {}): () => void {
     }
 
     // Verify session ID and origin for all subsequent messages
-    if (!activeSessionId || msg.sessionId !== activeSessionId) return;
+    if (!activeSessionId || msg.sessionId !== activeSessionId || event.source !== viewerWindow) return;
     if (!viewerOrigin || event.origin !== viewerOrigin) return;
 
     // Apply scroll from peer frame

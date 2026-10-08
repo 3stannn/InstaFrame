@@ -4,6 +4,8 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import net from "net";
+import FRAME_METAS from "../../../../public/assets/frames/frame-meta.json";
+import { getFrameContentHeight } from "@/lib/frame-layout";
 import { DEVICE_PRESETS } from "@/lib/devices";
 import { validateUrlSafe, isPrivateOrBlockedIP } from "@/lib/ssrf";
 import {
@@ -100,26 +102,33 @@ export async function POST(request: NextRequest) {
 
   try {
     // 1. Validation Stage
-    const body = await request.json().catch(() => ({}));
+    const rawBody: unknown = await request.json().catch(() => null);
+    if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) return NextResponse.json({ error: "Invalid capture request" }, { status: 400 });
+    const body = rawBody as Partial<{
+      url: string; presetKey: string; customW: number; customH: number;
+      useCustomDimensions: boolean; frameId: string; zoomLevel: number;
+      captureFullPage: boolean; captureQuality: string; settleDelay: number; scrollX: number; scrollY: number;
+    }>;
     const {
       url,
       presetKey = "macbook-air-13",
       customW = 1440,
       customH = 900,
+      useCustomDimensions = false,
       frameId = "none",
       zoomLevel = 100,
       captureFullPage = false,
       captureQuality = "preview",
       settleDelay = 1000,
+      scrollX = 0,
+      scrollY = 0,
     } = body;
 
     const validatedQuality: "preview" | "export" =
       captureQuality === "export" ? "export" : "preview";
 
-    const validatedSettleDelay = Math.max(
-      0,
-      Math.min(5000, parseInt(String(settleDelay ?? 1000), 10) || 1000)
-    );
+    const delay = Number(settleDelay);
+    const validatedSettleDelay = Number.isFinite(delay) ? Math.max(0, Math.min(5000, delay)) : 1000;
 
     logger = new CaptureLogger({
       url: String(url || ""),
@@ -173,6 +182,11 @@ export async function POST(request: NextRequest) {
       userAgent = preset.userAgent || null;
     }
 
+    if (useCustomDimensions) {
+      deviceWidth = Math.max(100, Math.min(7680, Math.round(Number(customW)) || 1440));
+      deviceHeight = Math.max(100, Math.min(7680, Math.round(Number(customH)) || 900));
+    }
+
     // Preview mode uses 1x density; export mode uses bounded higher density (up to 2x)
     const deviceScaleFactor =
       validatedQuality === "preview" ? 1 : Math.min(baseScaleFactor, 2);
@@ -185,19 +199,10 @@ export async function POST(request: NextRequest) {
     // Calculate emulated height matching exact frame content window
     let emulatedHeight = deviceHeight;
     if (!captureFullPage) {
-      if (frameId === "pro-display-xdr" || frameId === "apple-pro-display-xdr" || frameId === "xdr") {
-        emulatedHeight = Math.round(deviceWidth * (2944 / 5545)); // ~1087px for 2048w
-      } else if (frameId === "macbook-air-13" || frameId === "macbook-air" || frameId === "macbook-pro-clay") {
-        emulatedHeight = Math.round(deviceWidth * (2103 / 3443)); // ~782px for 1280w
-      } else if (frameId === "ipad-pro" || frameId === "ipad-pro-13" || frameId === "ipad-pro-11" || frameId === "ipad-pro-12") {
-        emulatedHeight = Math.round(deviceWidth * (2144 / 2859)); // ~1032px for 1376w
-      } else if (frameId === "iphone-15" || frameId === "iphone-16" || frameId === "iphone-clay-dark" || frameId === "iphone-clay-light") {
-        emulatedHeight = Math.round(deviceWidth * (2062 / 1010)); // ~802px for 393w
-      } else if (frameId === "pixel-8" || frameId === "pixel") {
-        emulatedHeight = Math.round(deviceWidth * (1999 / 900)); // ~915px for 412w
-      } else if (frameId === "s24" || frameId === "samsung-s24-ultra" || frameId === "s24-ultra") {
-        emulatedHeight = Math.round(deviceWidth * (2163 / 1005)); // ~887px for 412w
-      }
+      const aliases: Record<string, string> = { "macbook-air": "macbook-air-13", "pixel": "pixel-8", "samsung-s24-ultra": "s24", "s24-ultra": "s24" };
+      const frameKey = aliases[String(frameId)] || String(frameId);
+      const meta = FRAME_METAS[frameKey as keyof typeof FRAME_METAS];
+      if (meta) emulatedHeight = getFrameContentHeight(meta, deviceWidth);
     }
 
     logger.endStage("validation");
@@ -386,7 +391,8 @@ export async function POST(request: NextRequest) {
 
     // SSRF defense-in-depth: intercept subresources & redirects
     await page.setRequestInterception(true);
-    page.on("request", (req) => {
+    const checkedOrigins = new Map<string, Promise<boolean>>();
+    page.on("request", async (req) => {
       try {
         const reqUrl = req.url();
         const parsed = new URL(reqUrl);
@@ -413,7 +419,18 @@ export async function POST(request: NextRequest) {
           req.abort("blockedbyclient").catch(() => {});
           return;
         }
-        req.continue().catch(() => {});
+        if (proto === "http:" || proto === "https:") {
+          let allowed = checkedOrigins.get(parsed.origin);
+          if (!allowed) {
+            allowed = validateUrlSafe(reqUrl).then((result) => result.safe).catch(() => false);
+            checkedOrigins.set(parsed.origin, allowed);
+          }
+          if (!(await allowed)) {
+            if (!req.isInterceptResolutionHandled()) req.abort("blockedbyclient").catch(() => {});
+            return;
+          }
+        }
+        if (!req.isInterceptResolutionHandled()) req.continue().catch(() => {});
       } catch {
         req.abort("blockedbyclient").catch(() => {});
       }
@@ -577,10 +594,11 @@ export async function POST(request: NextRequest) {
     }).catch(() => {});
 
     // Apply zoom if specified
-    if (zoomLevel && zoomLevel !== 100) {
+    const validatedZoom = Math.max(25, Math.min(300, Number(zoomLevel) || 100));
+    if (validatedZoom !== 100) {
       await page.evaluate((z) => {
         (document.documentElement.style as unknown as { zoom: string }).zoom = String(z / 100);
-      }, zoomLevel).catch(() => {});
+      }, validatedZoom).catch(() => {});
     }
 
     logger.endStage("readiness");
@@ -613,6 +631,16 @@ export async function POST(request: NextRequest) {
         // Fallback if scroll evaluation is interrupted
       }
       logger.endStage("scrolling");
+    }
+
+    if (!captureFullPage) {
+      const x = Number.isFinite(Number(scrollX)) ? Math.max(0, Math.min(1000000, Number(scrollX))) : 0;
+      const y = Number.isFinite(Number(scrollY)) ? Math.max(0, Math.min(1000000, Number(scrollY))) : 0;
+      await page.evaluate(async (left, top) => {
+        document.documentElement.style.scrollBehavior = "auto";
+        window.scrollTo({ left, top, behavior: "instant" });
+        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      }, x, y);
     }
 
     // 8. Screenshot Encoding Stage

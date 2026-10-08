@@ -21,7 +21,6 @@ export interface DropdownItem {
   icon?: "monitor" | "laptop" | "tablet" | "phone" | "custom" | "raw" | "pro";
   swatchClass?: string;
   swatchStyle?: React.CSSProperties;
-  isPro?: boolean;
 }
 
 export interface CustomDropdownProps {

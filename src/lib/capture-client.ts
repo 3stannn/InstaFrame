@@ -11,11 +11,14 @@ export interface CaptureRequestParams {
   presetKey?: string;
   customW?: number;
   customH?: number;
+  useCustomDimensions?: boolean;
   frameId?: string;
   zoomLevel?: number;
   captureFullPage?: boolean;
   captureQuality?: "preview" | "export";
   settleDelay?: number;
+  scrollX?: number;
+  scrollY?: number;
   signal?: AbortSignal;
 }
 
@@ -45,7 +48,7 @@ const MAX_CACHE_ENTRIES = 20;
  * Builds a deterministic cache key based on capture-affecting parameters.
  */
 export function getCaptureCacheKey(params: CaptureRequestParams): string {
-  let normalizedUrl = params.url.trim().toLowerCase();
+  let normalizedUrl = params.url.trim();
   try {
     const parsed = new URL(normalizedUrl);
     normalizedUrl = parsed.toString();
@@ -58,11 +61,14 @@ export function getCaptureCacheKey(params: CaptureRequestParams): string {
     params.presetKey || "macbook-air-13",
     params.customW || 1440,
     params.customH || 900,
+    Boolean(params.useCustomDimensions),
     params.frameId || "none",
     params.zoomLevel || 100,
     Boolean(params.captureFullPage),
     params.captureQuality || "preview",
     params.settleDelay ?? 1000,
+    params.scrollX || 0,
+    params.scrollY || 0,
   ].join("::");
 }
 
@@ -87,6 +93,9 @@ export async function executeScreenshotCapture(
 ): Promise<CaptureResult> {
   const cacheKey = getCaptureCacheKey(params);
 
+  if (params.signal?.aborted) {
+    return { success: false, error: "Capture request was cancelled.", transferTimeMs: 0, payloadSizeBytes: 0 };
+  }
   if (!options?.skipCache) {
     const cached = getCachedCapture(cacheKey);
     if (cached) {
@@ -111,11 +120,14 @@ export async function executeScreenshotCapture(
         presetKey: params.presetKey,
         customW: params.customW,
         customH: params.customH,
+        useCustomDimensions: params.useCustomDimensions,
         frameId: params.frameId,
         zoomLevel: params.zoomLevel,
         captureFullPage: params.captureFullPage,
         captureQuality: params.captureQuality || "preview",
         settleDelay: params.settleDelay ?? 1000,
+        scrollX: params.scrollX || 0,
+        scrollY: params.scrollY || 0,
       }),
       signal: params.signal,
     });
@@ -130,7 +142,7 @@ export async function executeScreenshotCapture(
     if (res.ok && isJson) {
       const data: CaptureResponseData = await res.json();
       if (data && data.screenshotBase64) {
-        setCachedCapture(cacheKey, data);
+        if (!params.signal?.aborted) setCachedCapture(cacheKey, data);
         return {
           success: true,
           data,
@@ -139,6 +151,7 @@ export async function executeScreenshotCapture(
           fromCache: false,
         };
       }
+      return { success: false, error: "The screenshot service returned an incomplete image response.", statusCode: res.status, transferTimeMs: elapsedMs, payloadSizeBytes: 0 };
     }
 
     // Handle non-OK or non-JSON responses safely

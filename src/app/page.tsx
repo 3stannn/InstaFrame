@@ -1,17 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { Header } from "@/components/Header";
 import { ResponsiveStudio } from "@/components/ResponsiveStudio";
 import { MockupStudio } from "@/components/MockupStudio";
-import { LicenseModal } from "@/components/LicenseModal";
 import { ToastContainer, ToastMessage } from "@/components/Toast";
-import { checkProStatus } from "@/lib/licensing";
 
 export default function Home() {
   const [currentTab, setCurrentTab] = useState<"responsive" | "mockup">("responsive");
-  const [isPro, setIsPro] = useState(false);
-  const [licenseModalOpen, setLicenseModalOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [mockupConfig, setMockupConfig] = useState<{
     url?: string;
@@ -37,12 +33,6 @@ export default function Home() {
     setCurrentTab("mockup");
   };
 
-  // Check Pro licensing status on mount
-  useEffect(() => {
-    checkProStatus().then((active) => {
-      setIsPro(active);
-    });
-  }, []);
 
   const showToast = useCallback(
     (
@@ -74,7 +64,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-950 font-sans">
+    <div className="flex h-dvh min-h-0 flex-col bg-zinc-950 font-sans">
       {/* Top Navigation */}
       <Header
         currentTab={currentTab}
@@ -84,37 +74,24 @@ export default function Home() {
           }
           setCurrentTab(tab);
         }}
-        isPro={isPro}
-        onOpenLicense={() => setLicenseModalOpen(true)}
       />
 
       {/* Main Studio View */}
-      <main className="relative flex flex-1 flex-col overflow-hidden">
-        <div className={`flex-1 flex-col ${currentTab === "responsive" ? "flex" : "hidden"}`}>
+      <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className={`min-h-0 flex-1 flex-col ${currentTab === "responsive" ? "flex" : "hidden"}`}>
           <ResponsiveStudio
             onShowToast={showToast}
             onSendToMockup={handleSendToMockup}
           />
         </div>
-        <div className={`flex-1 flex-col ${currentTab === "mockup" ? "flex" : "hidden"}`}>
+        <div className={`min-h-0 flex-1 flex-col ${currentTab === "mockup" ? "flex" : "hidden"}`}>
           <MockupStudio
             isActive={currentTab === "mockup"}
-            isPro={isPro}
-            onOpenLicense={() => setLicenseModalOpen(true)}
             onShowToast={showToast}
             initialConfig={mockupConfig}
           />
         </div>
       </main>
-
-      {/* Pro License Dialog */}
-      <LicenseModal
-        isOpen={licenseModalOpen}
-        onClose={() => setLicenseModalOpen(false)}
-        isPro={isPro}
-        onStatusChange={setIsPro}
-        onShowToast={showToast}
-      />
 
       {/* Status Notifications */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />

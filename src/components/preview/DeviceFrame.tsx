@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   RotateCcw,
   RefreshCw,
@@ -59,6 +59,7 @@ export interface DeviceFrameProps {
     frame: string
   ) => void;
   onOpenBridgeHelp?: () => void;
+  onSnapshotScroll?: (id: string, x: number, y: number) => void;
   iframeRefCallback?: (id: string, el: HTMLIFrameElement | null) => void;
 }
 
@@ -83,6 +84,7 @@ export function DeviceFrame({
   onCaptureVisible,
   onOpenBridgeHelp,
   iframeRefCallback,
+  onSnapshotScroll,
 }: DeviceFrameProps) {
   const [iframeLoading, setIframeLoading] = useState(true);
   const [editDimensionsOpen, setEditDimensionsOpen] = useState(false);
@@ -98,22 +100,10 @@ export function DeviceFrame({
     setCustomH(String(device.height));
   }, [device.width, device.height]);
 
-  // Notify parent of iframe element lifecycle safely via effect
-  useEffect(() => {
-    const el = localIframeRef.current;
-    if (iframeRefCallback && el) {
-      iframeRefCallback(device.id, el);
-    }
-    return () => {
-      if (iframeRefCallback) {
-        iframeRefCallback(device.id, null);
-      }
-    };
-  }, [device.id, device.reloadKey, iframeRefCallback]);
-
   // Handle iframe load
   const handleIframeLoad = () => {
     setIframeLoading(false);
+    iframeRefCallback?.(device.id, localIframeRef.current);
   };
 
   // Trigger reload on reloadKey change
@@ -138,8 +128,18 @@ export function DeviceFrame({
   }, [url]);
 
   const isRestricted = Boolean(embedStatus?.checked && embedStatus?.isRestricted);
-  const isProxied = manualProxy !== null ? manualProxy : isRestricted;
+  let sameOrigin = false;
+  try { sameOrigin = new URL(url).origin === window.location.origin; } catch {}
+  const defaultInteractive = Boolean(url) && (!sameOrigin || isRestricted);
+  const isProxied = manualProxy !== null ? manualProxy : defaultInteractive;
+  useEffect(() => { setIframeLoading(Boolean(url)); }, [isProxied, previewMode, url]);
+
   const iframeSrc = isProxied ? `/api/proxy?url=${encodeURIComponent(url)}` : url;
+
+  const setIframeRef = useCallback((el: HTMLIFrameElement | null) => {
+    localIframeRef.current = el;
+    iframeRefCallback?.(device.id, el);
+  }, [device.id, iframeRefCallback]);
 
   const handleApplyDimensions = (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,7 +168,7 @@ export function DeviceFrame({
         }}
       >
         {/* Frame Toolbar */}
-        <div className="flex h-[34px] items-center justify-between border-b border-zinc-800 bg-zinc-900/90 px-2.5 select-none">
+        <div className="flex h-[36px] shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-900/90 px-2.5 select-none">
           {/* Left: Device Name, Dimensions Badge, Bridge Status */}
           <div className="flex items-center gap-2 overflow-hidden">
             {/* Loading / Active Status Dot */}
@@ -220,11 +220,11 @@ export function DeviceFrame({
             {previewMode === "live" && (
               <button
                 type="button"
-                onClick={() => setManualProxy((prev) => (prev !== null ? !prev : !isRestricted))}
+                onClick={() => setManualProxy((prev) => (prev !== null ? !prev : !defaultInteractive))}
                 title={
                   isProxied
-                    ? "Viewing via Proxy Engine (Bypassing X-Frame-Options & CSP). Click to switch to Direct."
-                    : "Viewing directly in iframe. Click to route via Proxy Engine."
+                    ? "Interactive preview with page and scroll tracking. Click to try direct loading."
+                    : "Direct website preview. Click to enable interactive page and scroll tracking."
                 }
                 className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[9.5px] font-medium transition-colors ${
                   isProxied
@@ -233,7 +233,7 @@ export function DeviceFrame({
                 }`}
               >
                 <Shield className="h-2.5 w-2.5" />
-                <span>{isProxied ? "Proxied" : "Direct"}</span>
+                <span>{isProxied ? "Interactive" : "Direct"}</span>
               </button>
             )}
           </div>
@@ -313,7 +313,7 @@ export function DeviceFrame({
             {/* Open Original in New Tab */}
             <button
               type="button"
-              onClick={() => window.open(url, "_blank")}
+              onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
               title="Open website in new browser tab"
               className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
             >
@@ -407,7 +407,7 @@ export function DeviceFrame({
               {url ? (
                 <iframe
                   key={`${device.id}-${device.reloadKey}-${isProxied ? "proxied" : "direct"}`}
-                  ref={localIframeRef}
+                  ref={setIframeRef}
                   src={iframeSrc}
                   data-device-id={device.id}
                   title={`${device.name} Viewport`}
@@ -435,8 +435,10 @@ export function DeviceFrame({
 
           {/* Mode 2: High-Fidelity Snapshot Fallback */}
           {previewMode === "preview" && (
-            <div className="h-full w-full overflow-y-auto overflow-x-hidden select-none bg-zinc-950">
+            <div onScroll={(e) => onSnapshotScroll?.(device.id, e.currentTarget.scrollLeft, e.currentTarget.scrollTop)} className="h-full w-full overflow-y-auto overflow-x-hidden select-none bg-zinc-950">
               {snapshotDataUrl ? (
+                // Snapshots are local data URLs and must preserve the captured pixel dimensions.
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={snapshotDataUrl}
                   alt={`${device.name} Snapshot`}

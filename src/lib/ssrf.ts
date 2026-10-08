@@ -56,7 +56,8 @@ export function isPrivateOrBlockedIP(ip: string): boolean {
   }
 
   if (net.isIPv6(cleanIp)) {
-    const lower = cleanIp.toLowerCase();
+    const lower = new URL(`http://[${cleanIp}]/`).hostname.slice(1, -1).toLowerCase();
+    if (lower.startsWith("ff") || lower.startsWith("fec") || lower.startsWith("fed") || lower.startsWith("fee") || lower.startsWith("fef")) return true;
     // ::1 / Loopback
     if (lower === "::1" || lower === "0:0:0:0:0:0:0:1") return true;
     // :: / Unspecified
@@ -118,7 +119,7 @@ export async function validateUrlSafe(urlStr: string): Promise<UrlValidationResu
     };
   }
 
-  const hostname = parsedUrl.hostname.toLowerCase();
+  const hostname = parsedUrl.hostname.toLowerCase().replace(/\.$/, "");
   const cleanHost = hostname.startsWith("[") && hostname.endsWith("]")
     ? hostname.slice(1, -1)
     : hostname;
@@ -190,7 +191,7 @@ export async function safeFetch(
   let currentUrl = urlStr;
   let hops = 0;
 
-  while (hops < maxHops) {
+  while (hops <= maxHops) {
     const validation = await validateUrlSafe(currentUrl);
     if (!validation.safe) {
       throw new Error(`SSRF validation failed: ${validation.error}`);
@@ -204,7 +205,7 @@ export async function safeFetch(
       response = await fetch(currentUrl, {
         ...init,
         redirect: "manual",
-        signal: init?.signal || controller.signal,
+        signal: init?.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal,
       });
     } finally {
       clearTimeout(timeoutId);

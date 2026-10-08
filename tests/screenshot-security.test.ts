@@ -1,5 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
+import dns from "node:dns/promises";
 import { isPrivateOrBlockedIP, validateUrlSafe } from "../src/lib/ssrf.ts";
 
 describe("SSRF & Network Security Protection", () => {
@@ -118,7 +119,8 @@ describe("SSRF & Network Security Protection", () => {
     }
   });
 
-  test("validateUrlSafe accepts valid public website", async () => {
+  test("validateUrlSafe accepts valid public website", async (t) => {
+    t.mock.method(dns, "lookup", async () => [{ address: "93.184.216.34", family: 4 }]);
     const res = await validateUrlSafe("https://example.com");
     assert.equal(res.safe, true);
     assert.equal(res.error, undefined);

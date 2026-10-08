@@ -1,3 +1,4 @@
+import { getBrowserChromeDimensions } from "./frame-layout";
 /**
  * HTML5 Canvas Mockup Compositor Engine (Web Native)
  * Pure client-side rendering with strict aspect ratio preservation (no distortion or compression)
@@ -232,10 +233,7 @@ export async function renderMockup({
 
   if (isDesktop && pageUrl) {
     const isMacbook = meta.name.toLowerCase().includes("macbook");
-    const menuBarHeight = isMacbook
-      ? Math.max(Math.round(meta.screenWidth * 0.014), 74)
-      : Math.round(meta.screenWidth * 0.013);
-    const safariHeight = Math.round(meta.screenWidth * 0.019);
+    const { menuBarHeight, safariHeight } = getBrowserChromeDimensions(meta.screenWidth, isMacbook);
     topOffset = menuBarHeight + safariHeight;
     drawMacBrowserChrome(ctx, meta.screenX, meta.screenY, meta.screenWidth, menuBarHeight, safariHeight, pageUrl, appleLogoImg);
   } else if (isIphone) {
@@ -269,36 +267,11 @@ export async function renderMockup({
     const drawY = meta.screenY + topOffset;
     ctx.drawImage(screenImg, drawX, drawY, drawW, drawH);
   } else {
-    // "smart" mode (default) - Match the extension's behavior:
-    if (contentZoom !== 1.0) {
-      const baseH = (scaledHeight >= availableHeight * 0.85 && scaledHeight <= availableHeight * 1.15)
-        ? availableHeight
-        : scaledHeight;
-      const drawW = meta.screenWidth * contentZoom;
-      const drawH = baseH * contentZoom;
-      const drawX = meta.screenX + (meta.screenWidth - drawW) / 2;
-      const drawY = meta.screenY + topOffset;
-      ctx.drawImage(screenImg, drawX, drawY, drawW, drawH);
-    } else if (scaledHeight >= availableHeight * 0.85 && scaledHeight <= availableHeight * 1.15) {
-      // 1. If scaled height is within 15% of available height (single-screen apps, web mockups):
-      // Fit cleanly to availableHeight so bottom footer reaches the bottom bezel with 0 gap!
-      ctx.drawImage(screenImg, meta.screenX, meta.screenY + topOffset, meta.screenWidth, availableHeight);
-    } else if (isDesktop && pageUrl && scaledHeight <= availableHeight * 1.25) {
-      // For desktop with pageUrl, fit to availableHeight as in extension line 238
-      ctx.drawImage(screenImg, meta.screenX, meta.screenY + topOffset, meta.screenWidth, availableHeight);
-    } else if (Math.abs(imageAspect - screenAspect) > 0.4) {
-      // Significant aspect ratio mismatch (e.g. 16:9 desktop snapshot put into portrait phone frame)
-      // Proportional cover anchored at top: eliminates the 75% white void without distortion!
-      const scale = Math.max(meta.screenWidth / screenImg.width, availableHeight / screenImg.height);
-      const drawW = screenImg.width * scale;
-      const drawH = screenImg.height * scale;
-      const drawX = meta.screenX + (meta.screenWidth - drawW) / 2;
-      const drawY = meta.screenY + topOffset;
-      ctx.drawImage(screenImg, drawX, drawY, drawW, drawH);
-    } else {
-      // Standard proportional draw anchored beneath topOffset
-      ctx.drawImage(screenImg, meta.screenX, meta.screenY + topOffset, meta.screenWidth, scaledHeight);
-    }
+    // Fit by width, anchored beneath the browser chrome, without stretching the screenshot.
+    const drawW = meta.screenWidth * contentZoom;
+    const drawH = scaledHeight * contentZoom;
+    const drawX = meta.screenX + (meta.screenWidth - drawW) / 2;
+    ctx.drawImage(screenImg, drawX, meta.screenY + topOffset, drawW, drawH);
   }
 
   ctx.restore();
@@ -361,7 +334,7 @@ function drawMacBrowserChrome(
   ctx.fillStyle = "#E5E5E5";
   ctx.fillRect(x, safariY + safariHeight - 2, width, 2);
 
-  const radius = safariHeight * 0.125;
+  const radius = width * 0.0045;
   const spacing = radius * 2.5;
   const startX = x + safariHeight * 0.45;
   const centerY = safariY + safariHeight / 2;
@@ -378,10 +351,10 @@ function drawMacBrowserChrome(
   });
 
   const barWidth = width * 0.44;
-  const barHeight = safariHeight * 0.5;
+  const barHeight = safariHeight * 0.66;
   const barX = x + (width - barWidth) / 2;
   const barY = safariY + (safariHeight - barHeight) / 2;
-  const barRadius = barHeight / 2;
+  const barRadius = barHeight * 0.22;
 
   ctx.beginPath();
   ctx.moveTo(barX + barRadius, barY);
@@ -391,8 +364,11 @@ function drawMacBrowserChrome(
   ctx.arcTo(barX, barY, barX + barWidth, barY, barRadius);
   ctx.closePath();
 
-  ctx.fillStyle = "#EAEAEA";
+  ctx.fillStyle = "#FFFFFF";
   ctx.fill();
+  ctx.lineWidth = Math.max(1, width * 0.0006);
+  ctx.strokeStyle = "#DADADD";
+  ctx.stroke();
 
   let displayUrl = url;
   try {
@@ -402,13 +378,13 @@ function drawMacBrowserChrome(
     // Keep as is
   }
 
-  const fontSize = barHeight * 0.48;
+  const fontSize = barHeight * 0.4;
   ctx.fillStyle = "#333333";
   ctx.font = `500 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
 
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(displayUrl, x + width / 2, centerY + fontSize * 0.05);
+  ctx.fillText(displayUrl, x + width / 2, centerY + fontSize * 0.05, barWidth - barHeight);
 }
 
 /**

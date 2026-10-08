@@ -33,6 +33,10 @@ interface DeviceSnapshot {
   width: number;
   height: number;
   fullHeight?: number;
+  targetUrl: string;
+  viewportWidth: number;
+  viewportHeight: number;
+  reloadKey: number;
 }
 
 import { executeScreenshotCapture } from "@/lib/capture-client";
@@ -120,12 +124,18 @@ export function ResponsiveStudio({
   const canvasRef = useRef<HTMLDivElement>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
   const bridgeControllerRef = useRef<PreviewBridgeController | null>(null);
+  const snapshotBatchRef = useRef(0);
+  const snapshotControllersRef = useRef(new Map<string, AbortController>());
+  const embedControllerRef = useRef<AbortController | null>(null);
+  const scrollPositionsRef = useRef(new Map<string, { x: number; y: number }>());
+  const settingsReadyRef = useRef(false);
   const iframeElementsRef = useRef<Map<string, HTMLIFrameElement>>(new Map());
 
 
   // Initialize saved settings on mount
   useEffect(() => {
     const saved = loadSettings();
+    settingsReadyRef.current = true;
     if (saved.responsive) {
       if (saved.responsive.layoutMode) setLayoutMode(saved.responsive.layoutMode);
       if (saved.responsive.syncScroll !== undefined) setSyncScroll(saved.responsive.syncScroll);
@@ -153,8 +163,6 @@ export function ResponsiveStudio({
   // Initialize Bridge Controller (Mode B)
   useEffect(() => {
     const controller = new PreviewBridgeController({
-      syncScroll,
-      scrollMode,
       onStatusChange: (deviceId, connected) => {
         setBridgeConnectedDevices((prev) => {
           if (prev[deviceId] === connected) return prev;
@@ -167,6 +175,7 @@ export function ResponsiveStudio({
     });
 
     bridgeControllerRef.current = controller;
+    iframeElementsRef.current.forEach((el, deviceId) => controller.registerFrame(deviceId, el, activeUrlRef.current));
 
     return () => {
       controller.destroy();
@@ -185,6 +194,35 @@ export function ResponsiveStudio({
   const activeUrlRef = useRef(activeUrl);
   activeUrlRef.current = activeUrl;
 
+  const activeDevicesRef = useRef(activeDevices);
+  activeDevicesRef.current = activeDevices;
+
+  useEffect(() => {
+    if (settingsReadyRef.current) {
+      saveSettings({ responsive: {
+        activeDevices: activeDevices.map(({ id, presetKey, name, width, height, rotated }) => ({ id, presetKey, name, width, height, rotated })),
+      } });
+    }
+    for (const [id, controller] of snapshotControllersRef.current) {
+      controller.abort();
+      snapshotControllersRef.current.delete(id);
+    }
+    setSnapshotLoading({});
+    setSnapshots((previous) => Object.fromEntries(Object.entries(previous).filter(([id, snap]) => {
+      const device = activeDevices.find((item) => item.id === id);
+      return device && snap.targetUrl === activeUrl && snap.viewportWidth === device.width && snap.viewportHeight === device.height && snap.reloadKey === device.reloadKey;
+    })));
+  }, [activeUrl, activeDevices]);
+
+  useEffect(() => {
+    if (settingsReadyRef.current) saveSettings({ responsive: { scale: currentScale } });
+  }, [currentScale]);
+
+  useEffect(() => () => {
+    snapshotControllersRef.current.forEach((controller) => controller.abort());
+    embedControllerRef.current?.abort();
+  }, []);
+
   // Iframe registration callback (stable across renders)
   const handleIframeRef = useCallback((deviceId: string, el: HTMLIFrameElement | null) => {
     if (el) {
@@ -202,15 +240,20 @@ export function ResponsiveStudio({
 
   // Check framing permissions on target URL
   const checkEmbedCapability = useCallback(async (target: string) => {
+    embedControllerRef.current?.abort();
     if (!target) return;
+    const controller = new AbortController();
+    embedControllerRef.current = controller;
     setEmbedStatus({
       checked: false,
       canEmbed: true,
       isRestricted: false,
     });
     try {
-      const res = await fetch(`/api/check-embed?url=${encodeURIComponent(target)}`);
+      const res = await fetch(`/api/check-embed?url=${encodeURIComponent(target)}`, { signal: controller.signal });
       const data = await res.json();
+      if (controller.signal.aborted || activeUrlRef.current !== target) return;
+      if (!res.ok) throw new Error(data.error || "Could not check framing");
       setEmbedStatus({
         checked: true,
         canEmbed: data.canEmbed !== false,
@@ -218,6 +261,7 @@ export function ResponsiveStudio({
         reason: data.reason,
       });
     } catch {
+      if (controller.signal.aborted || activeUrlRef.current !== target) return;
       setEmbedStatus({
         checked: true,
         canEmbed: true, // Allow direct iframe attempt even if probe endpoint fails
@@ -229,8 +273,11 @@ export function ResponsiveStudio({
 
   // Fetch isolated snapshot for a single device (for capture or snapshot fallback)
   const captureDeviceSnapshot = useCallback(
-    async (device: DeviceFrameDevice, target: string): Promise<DeviceSnapshot | null> => {
+    async (device: DeviceFrameDevice, target: string, force = false): Promise<DeviceSnapshot | null> => {
       if (!target) return null;
+      snapshotControllersRef.current.get(device.id)?.abort();
+      const controller = new AbortController();
+      snapshotControllersRef.current.set(device.id, controller);
       setSnapshotLoading((prev) => ({ ...prev, [device.id]: true }));
       try {
         const result = await executeScreenshotCapture({
@@ -238,10 +285,14 @@ export function ResponsiveStudio({
           presetKey: device.presetKey,
           customW: device.width,
           customH: device.height,
+          useCustomDimensions: true,
+          signal: controller.signal,
           captureFullPage: true,
           captureQuality: "preview",
           settleDelay: 1000,
-        });
+        }, { skipCache: force });
+        const currentDevice = activeDevicesRef.current.find((item) => item.id === device.id);
+        if (controller.signal.aborted || target !== activeUrlRef.current || !currentDevice || currentDevice.width !== device.width || currentDevice.height !== device.height || currentDevice.reloadKey !== device.reloadKey) return null;
 
         if (result.success && result.data) {
           const snap: DeviceSnapshot = {
@@ -249,6 +300,10 @@ export function ResponsiveStudio({
             width: result.data.width,
             height: result.data.height,
             fullHeight: result.data.fullHeight,
+            targetUrl: target,
+            viewportWidth: device.width,
+            viewportHeight: device.height,
+            reloadKey: device.reloadKey,
           };
           setSnapshots((prev) => ({
             ...prev,
@@ -265,7 +320,10 @@ export function ResponsiveStudio({
         onShowToast(`Capture failed: ${msg}`, "error");
         return null;
       } finally {
-        setSnapshotLoading((prev) => ({ ...prev, [device.id]: false }));
+        if (snapshotControllersRef.current.get(device.id) === controller) {
+          snapshotControllersRef.current.delete(device.id);
+          setSnapshotLoading((prev) => ({ ...prev, [device.id]: false }));
+        }
       }
     },
     [onShowToast]
@@ -275,18 +333,23 @@ export function ResponsiveStudio({
   const captureAllSnapshots = useCallback(
     async (target: string, devicesToCapture = activeDevices) => {
       if (!target) return;
+      const batch = ++snapshotBatchRef.current;
       for (const device of devicesToCapture) {
-        await captureDeviceSnapshot(device, target);
+        if (batch !== snapshotBatchRef.current || target !== activeUrlRef.current) break;
+        await captureDeviceSnapshot(device, target, true);
       }
     },
     [activeDevices, captureDeviceSnapshot]
   );
 
+  useEffect(() => {
+    if (previewMode === "preview" && activeUrl) captureAllSnapshots(activeUrl);
+  }, [previewMode, activeUrl, activeDevices, captureAllSnapshots]);
+
   // On activeUrl change
   useEffect(() => {
-    if (activeUrl) {
-      checkEmbedCapability(activeUrl);
-    }
+    checkEmbedCapability(activeUrl);
+    scrollPositionsRef.current.clear();
     // Re-register iframes in bridge controller
     iframeElementsRef.current.forEach((el, deviceId) => {
       if (bridgeControllerRef.current) {
@@ -433,10 +496,6 @@ export function ResponsiveStudio({
     setActiveDevices((prev) =>
       prev.map((d) => (d.id === id ? { ...d, reloadKey: d.reloadKey + 1 } : d))
     );
-    const targetDev = activeDevices.find((d) => d.id === id);
-    if (targetDev && previewMode === "preview") {
-      captureDeviceSnapshot(targetDev, activeUrl);
-    }
   };
 
   // Reload all viewports
@@ -444,9 +503,6 @@ export function ResponsiveStudio({
     setActiveDevices((prev) =>
       prev.map((d) => ({ ...d, reloadKey: d.reloadKey + 1 }))
     );
-    if (previewMode === "preview") {
-      captureAllSnapshots(activeUrl);
-    }
     onShowToast("Reloaded all viewports", "info");
   };
 
@@ -504,8 +560,10 @@ export function ResponsiveStudio({
 
   useEffect(() => {
     recalculateScale();
+    const observer = new ResizeObserver(recalculateScale);
+    if (canvasRef.current) observer.observe(canvasRef.current);
     window.addEventListener("resize", recalculateScale);
-    return () => window.removeEventListener("resize", recalculateScale);
+    return () => { observer.disconnect(); window.removeEventListener("resize", recalculateScale); };
   }, [recalculateScale]);
 
   // Handle visible capture
@@ -523,28 +581,83 @@ export function ResponsiveStudio({
       return;
     }
 
-    let snapshot: DeviceSnapshot | undefined | null = snapshots[deviceId];
-    if (!snapshot?.dataUrl) {
-      onShowToast("Generating capture snapshot. Please wait...", "info");
-      snapshot = await captureDeviceSnapshot(device, activeUrl);
-    }
-
-    if (!snapshot?.dataUrl) {
+    if (previewMode === "live") {
+      const reported = bridgeControllerRef.current?.getFrameState(deviceId);
+      let target = reported?.url || activeUrl;
+      let position = reported?.connected ? { x: reported.scrollX, y: reported.scrollY } : undefined;
+      try {
+        const frameWindow = iframeElementsRef.current.get(deviceId)?.contentWindow;
+        if (frameWindow) {
+          target = frameWindow.location.href;
+          position = { x: frameWindow.scrollX, y: frameWindow.scrollY };
+        }
+      } catch { /* Interactive previews report their location through the bridge. */ }
+      const validation = sanitizeAndValidateUrl(target);
+      if (!validation.isValid || !position) {
+        onShowToast("Switch this viewport to Interactive mode to snap the page at its current position.", "info");
+        return;
+      }
+      snapshotControllersRef.current.get(deviceId)?.abort();
+      const controller = new AbortController();
+      snapshotControllersRef.current.set(deviceId, controller);
+      setSnapshotLoading((prev) => ({ ...prev, [deviceId]: true }));
+      try {
+        const result = await executeScreenshotCapture({
+          url: validation.normalizedUrl,
+          presetKey: device.presetKey,
+          customW: device.width,
+          customH: device.height,
+          useCustomDimensions: true,
+          captureFullPage: false,
+          scrollX: position.x,
+          scrollY: position.y,
+          captureQuality: "preview",
+          signal: controller.signal,
+        }, { skipCache: true });
+        if (controller.signal.aborted) return;
+        if (!result.success || !result.data) {
+          onShowToast(result.error || "Could not snap this page.", "error");
+          return;
+        }
+        if (outputMode === "mockup") {
+          onSendToMockup?.(validation.normalizedUrl, selectedPreset, selectedFrame, result.data.screenshotBase64);
+        } else {
+          downloadPng(result.data.screenshotBase64, `instaframe-${device.presetKey}-${Date.now()}.png`);
+        }
+        onShowToast("Snapped the current page and scroll position.", "success");
+      } finally {
+        if (snapshotControllersRef.current.get(deviceId) === controller) {
+          snapshotControllersRef.current.delete(deviceId);
+          setSnapshotLoading((prev) => ({ ...prev, [deviceId]: false }));
+        }
+      }
       return;
     }
 
+    const targetAtCapture = activeUrl;
+    let snapshot: DeviceSnapshot | undefined | null = snapshots[deviceId];
+    if (!snapshot?.dataUrl || snapshot.targetUrl !== activeUrl || snapshot.viewportWidth !== device.width || snapshot.viewportHeight !== device.height || snapshot.reloadKey !== device.reloadKey) {
+      onShowToast("Generating capture snapshot. Please wait...", "info");
+      snapshot = await captureDeviceSnapshot(device, activeUrl, true);
+    }
+
+    if (!snapshot?.dataUrl || targetAtCapture !== activeUrlRef.current) {
+      return;
+    }
+
+    const position = scrollPositionsRef.current.get(deviceId);
     try {
       const croppedDataUrl = await cropViewportImage({
         sourceDataUrl: snapshot.dataUrl,
         deviceWidth: device.width,
         deviceHeight: device.height,
-        scrollTop: 0,
-        scrollLeft: 0,
+        scrollTop: position?.y || 0,
+        scrollLeft: position?.x || 0,
       });
 
       if (outputMode === "mockup") {
         if (onSendToMockup) {
-          onSendToMockup(activeUrl, selectedPreset, selectedFrame, croppedDataUrl);
+          onSendToMockup(targetAtCapture, selectedPreset, selectedFrame, croppedDataUrl);
           onShowToast(`Captured visible area sent to Mockup Studio (${selectedPreset})`, "success");
         }
       } else {
@@ -583,9 +696,9 @@ export function ResponsiveStudio({
   const viewerOrigin = typeof window !== "undefined" ? window.location.origin : "";
 
   return (
-    <div className="flex h-full flex-col bg-zinc-950 text-zinc-100">
+    <div className="flex min-h-0 h-full flex-col bg-zinc-950 text-zinc-100">
       {/* Studio Toolbar Header */}
-      <div className="relative z-30 flex items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-950 px-3.5 py-2">
+      <div className="relative z-30 shrink-0 flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-950 px-3.5 py-2">
         {/* Left Side: URL Form */}
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
           {/* URL Input Form */}
@@ -694,6 +807,10 @@ export function ResponsiveStudio({
         {/* Right Side Controls: Layout Mode Toggle + Sync Scroll + Zoom Segmented Control */}
         <div className="flex items-center gap-3 shrink-0">
           {/* Layout Mode (Row vs Grid) */}
+          <div className="flex items-center rounded-md border border-zinc-800 bg-zinc-900/90 p-0.5 text-xs">
+            <button type="button" onClick={() => setPreviewMode("live")} className={`rounded px-2 py-1 ${previewMode === "live" ? "bg-white text-zinc-950" : "text-zinc-400"}`}>Live</button>
+            <button type="button" onClick={() => setPreviewMode("preview")} className={`rounded px-2 py-1 ${previewMode === "preview" ? "bg-white text-zinc-950" : "text-zinc-400"}`}>Snapshot</button>
+          </div>
           <div className="flex items-center rounded-md border border-zinc-800 bg-zinc-900/90 p-0.5 text-xs">
             <button
               type="button"
@@ -813,7 +930,7 @@ export function ResponsiveStudio({
       {/* Main Studio Canvas */}
       <div
         ref={canvasRef}
-        className="studio-grid-bg relative flex-1 overflow-auto p-6 min-h-[500px]"
+        className="studio-grid-bg relative flex-1 overflow-auto p-6 min-h-0"
       >
         <div
           className={`flex gap-8 items-start pb-6 ${
@@ -845,6 +962,7 @@ export function ResponsiveStudio({
                 onCaptureVisible={handleCaptureVisible}
                 onOpenBridgeHelp={() => setBridgeHelpOpen(true)}
                 iframeRefCallback={handleIframeRef}
+                onSnapshotScroll={(id, x, y) => scrollPositionsRef.current.set(id, { x, y })}
               />
             );
           })}

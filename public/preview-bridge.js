@@ -54,11 +54,27 @@
     return validTypes.indexOf(data.type) !== -1;
   }
 
+  function currentPageUrl() {
+    return window.__INSTAFRAME_TARGET_URL__ || window.location.href;
+  }
+
   function handleMessage(event) {
+    if (event.source === window.parent && event.data && event.data.type === "INSTAFRAME_PAGE_ZOOM") {
+      var zoomOrigin = (event.origin || "").toLowerCase();
+      if (Object.keys(allowedOrigins).length && !allowedOrigins[zoomOrigin]) return;
+      var zoom = Number(event.data.zoom);
+      if (isFinite(zoom) && zoom >= 25 && zoom <= 300) document.documentElement.style.zoom = String(zoom / 100);
+      return;
+    }
+    if (event.source === window.parent && event.data && event.data.type === "INSTAFRAME_HISTORY_BACK") {
+      if (viewerOrigin && event.origin === viewerOrigin) history.back();
+      return;
+    }
     if (!isValidBridgeMessage(event.data)) return;
     var msg = event.data;
 
     if (msg.type === "PREVIEW_HANDSHAKE_INIT") {
+      if (event.source !== window.parent) return;
       var origin = (event.origin || "").toLowerCase();
       var hasOriginFilter = Object.keys(allowedOrigins).length > 0;
 
@@ -83,7 +99,7 @@
           click: false,
           input: false
         },
-        url: window.location.href,
+        url: currentPageUrl(),
         title: document.title,
         maxScroll: { x: maxScrollX, y: maxScrollY },
         timestamp: Date.now()
@@ -91,13 +107,14 @@
 
       try {
         viewerWindow.postMessage(ack, viewerOrigin);
+        onScroll();
       } catch (err) {
         console.error("[InstaFrame Bridge] Failed to send handshake ack:", err);
       }
       return;
     }
 
-    if (!activeSessionId || msg.sessionId !== activeSessionId) return;
+    if (!activeSessionId || msg.sessionId !== activeSessionId || event.source !== viewerWindow) return;
     if (!viewerOrigin || event.origin !== viewerOrigin) return;
 
     if (msg.type === "PREVIEW_SCROLL_APPLY") {
@@ -161,7 +178,7 @@
     var navMsg = {
       type: "PREVIEW_NAVIGATED",
       sessionId: activeSessionId,
-      url: window.location.href,
+      url: currentPageUrl(),
       title: document.title,
       timestamp: Date.now()
     };
@@ -169,6 +186,16 @@
       viewerWindow.postMessage(navMsg, viewerOrigin);
     } catch (err) {}
   }
+
+  ["pushState", "replaceState"].forEach(function(method) {
+    var original = history[method];
+    history[method] = function() {
+      var result = original.apply(history, arguments);
+      onNavigated();
+      onScroll();
+      return result;
+    };
+  });
 
   window.addEventListener("message", handleMessage);
   window.addEventListener("scroll", onScroll, { passive: true });

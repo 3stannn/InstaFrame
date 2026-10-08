@@ -308,13 +308,13 @@ export const DEVICE_PRESETS: Record<string, DevicePreset> = new Proxy(rawPresets
 export const DEVICE_CATEGORIES = ["Desktop & Laptops", "Tablets", "Mobile Devices"] as const;
 
 export const FRAME_OPTIONS = [
-  { id: "none", name: "Raw", meta: "Default", isPro: false, section: "Default", icon: "raw" as const },
-  { id: "pro-display-xdr", name: "Pro Display XDR", meta: "Pro", isPro: true, section: "Displays", icon: "monitor" as const },
-  { id: "macbook-air-13", name: 'MacBook Air 13"', meta: "Pro", isPro: true, section: "Laptops", icon: "laptop" as const },
-  { id: "ipad-pro", name: "iPad Pro", meta: "Pro", isPro: true, section: "Tablets", icon: "tablet" as const },
-  { id: "iphone-15", name: "iPhone 15", meta: "Pro", isPro: true, section: "Phones", icon: "phone" as const },
-  { id: "s24", name: "Galaxy S24 Ultra", meta: "Pro", isPro: true, section: "Phones", icon: "phone" as const },
-  { id: "pixel-8", name: "Pixel 8", meta: "Pro", isPro: true, section: "Phones", icon: "phone" as const }
+  { id: "none", name: "Raw", meta: "Default", section: "Default", icon: "raw" as const },
+  { id: "pro-display-xdr", name: "Pro Display XDR", meta: "", section: "Displays", icon: "monitor" as const },
+  { id: "macbook-air-13", name: 'MacBook Air 13"', meta: "", section: "Laptops", icon: "laptop" as const },
+  { id: "ipad-pro", name: "iPad Pro", meta: "", section: "Tablets", icon: "tablet" as const },
+  { id: "iphone-15", name: "iPhone 15", meta: "", section: "Phones", icon: "phone" as const },
+  { id: "s24", name: "Galaxy S24 Ultra", meta: "", section: "Phones", icon: "phone" as const },
+  { id: "pixel-8", name: "Pixel 8", meta: "", section: "Phones", icon: "phone" as const }
 ] as const;
 
 export const BACKDROP_OPTIONS = [

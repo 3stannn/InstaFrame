@@ -227,9 +227,9 @@ export function CaptureViewportPopover({
               </optgroup>
               <optgroup label="Mobile Devices">
                 <option value="iphone-15">iPhone 15</option>
-                <option value="iphone-15-pro-max">iPhone 15 Pro Max</option>
+                <option value="iphone-16-pro-max">iPhone 16 Pro Max</option>
                 <option value="pixel-8">Google Pixel 8</option>
-                <option value="s24-ultra">Samsung Galaxy S24 Ultra</option>
+                <option value="samsung-s24-ultra">Samsung Galaxy S24 Ultra</option>
               </optgroup>
               <optgroup label="Tablets">
                 <option value="ipad-pro-11">iPad Pro 11&quot;</option>

@@ -7,15 +7,15 @@
  */
 
 import {
-  BridgeMessage,
-  BridgeCapabilities,
-  HandshakeInitMessage,
-  HandshakeAckMessage,
-  ScrollUpdateMessage,
-  ScrollApplyMessage,
-  NavigatedMessage,
+  type BridgeMessage,
+  type BridgeCapabilities,
+  type HandshakeInitMessage,
+  type HandshakeAckMessage,
+  type ScrollUpdateMessage,
+  type ScrollApplyMessage,
+  type NavigatedMessage,
   isValidBridgeMessage,
-} from "./preview-bridge";
+} from "./preview-bridge.ts";
 
 export interface FrameSession {
   sessionId: string;
@@ -27,6 +27,14 @@ export interface FrameSession {
   lastUrl?: string;
   lastTitle?: string;
   maxScroll?: { x: number; y: number };
+  scrollPosition?: { x: number; y: number };
+}
+
+export interface LiveFrameState {
+  url: string;
+  scrollX: number;
+  scrollY: number;
+  connected: boolean;
 }
 
 export type BridgeStatusChangeCallback = (
@@ -40,6 +48,7 @@ export class PreviewBridgeController {
   private sessions = new Map<string, FrameSession>(); // key: sessionId
   private deviceToSession = new Map<string, string>(); // key: deviceId -> sessionId
   private onStatusChange?: BridgeStatusChangeCallback;
+  private onStateChange?: (deviceId: string, state: LiveFrameState) => void;
   private isDispatchingScroll = false;
   private syncScrollEnabled = true;
   private scrollMode: "ratio" | "pixels" = "ratio";
@@ -47,10 +56,12 @@ export class PreviewBridgeController {
 
   constructor(options?: {
     onStatusChange?: BridgeStatusChangeCallback;
+    onStateChange?: (deviceId: string, state: LiveFrameState) => void;
     syncScroll?: boolean;
     scrollMode?: "ratio" | "pixels";
   }) {
     this.onStatusChange = options?.onStatusChange;
+    this.onStateChange = options?.onStateChange;
     this.syncScrollEnabled = options?.syncScroll ?? true;
     this.scrollMode = options?.scrollMode ?? "ratio";
 
@@ -58,6 +69,23 @@ export class PreviewBridgeController {
     if (typeof window !== "undefined") {
       window.addEventListener("message", this.boundMessageHandler);
     }
+  }
+
+  public getFrameState(deviceId: string): LiveFrameState | undefined {
+    const id = this.deviceToSession.get(deviceId);
+    const session = id ? this.sessions.get(id) : undefined;
+    if (!session) return undefined;
+    return { url: session.lastUrl || "", scrollX: session.scrollPosition?.x || 0, scrollY: session.scrollPosition?.y || 0, connected: session.isBridgeConnected };
+  }
+
+  private reportState(session: FrameSession) {
+    const state = this.getFrameState(session.deviceId);
+    if (state) this.onStateChange?.(session.deviceId, state);
+  }
+
+  public getScrollPosition(deviceId: string) {
+    const sessionId = this.deviceToSession.get(deviceId);
+    return sessionId ? this.sessions.get(sessionId)?.scrollPosition : undefined;
   }
 
   public setSyncScroll(enabled: boolean) {
@@ -76,12 +104,10 @@ export class PreviewBridgeController {
     iframe: HTMLIFrameElement,
     targetUrl: string
   ): string {
-    // Teardown any existing session for this device
-    this.unregisterFrame(deviceId);
-
     let targetOrigin = "*";
     try {
-      targetOrigin = new URL(targetUrl).origin;
+      targetOrigin = iframe.hasAttribute?.("sandbox") && !iframe.sandbox.contains("allow-same-origin")
+        ? "null" : new URL(targetUrl).origin;
     } catch {}
 
     // If identical frame is already registered, don't teardown and rebuild
@@ -89,6 +115,7 @@ export class PreviewBridgeController {
     if (existingSessionId) {
       const existing = this.sessions.get(existingSessionId);
       if (existing && existing.iframe === iframe && existing.targetOrigin === targetOrigin) {
+        this.sendHandshake(existing);
         return existingSessionId;
       }
       this.unregisterFrame(deviceId);
@@ -159,7 +186,7 @@ export class PreviewBridgeController {
       try {
         session.iframe.contentWindow.postMessage(
           { type: "PREVIEW_TEARDOWN", sessionId, timestamp: Date.now() },
-          session.targetOrigin || "*"
+          session.targetOrigin === "null" ? "*" : session.targetOrigin || "*"
         );
       } catch {}
     }
@@ -212,6 +239,8 @@ export class PreviewBridgeController {
       session.lastUrl = ackMsg.url;
       session.lastTitle = ackMsg.title;
       session.maxScroll = ackMsg.maxScroll;
+      session.scrollPosition = { x: 0, y: 0 };
+      this.reportState(session);
 
       if (this.onStatusChange) {
         this.onStatusChange(session.deviceId, true, session.capabilities, {
@@ -224,8 +253,10 @@ export class PreviewBridgeController {
 
     // 2. Scroll Update
     if (msg.type === "PREVIEW_SCROLL_UPDATE") {
-      if (!this.syncScrollEnabled || this.isDispatchingScroll) return;
       const scrollMsg = msg as ScrollUpdateMessage;
+      session.scrollPosition = { x: scrollMsg.scrollX, y: scrollMsg.scrollY };
+      this.reportState(session);
+      if (!this.syncScrollEnabled || this.isDispatchingScroll) return;
 
       this.isDispatchingScroll = true;
 
@@ -237,6 +268,11 @@ export class PreviewBridgeController {
           peerSession.capabilities.scroll &&
           peerSession.iframe?.contentWindow
         ) {
+          if (this.scrollMode === "pixels") {
+            peerSession.scrollPosition = { x: scrollMsg.scrollX, y: scrollMsg.scrollY };
+          } else if (peerSession.maxScroll) {
+            peerSession.scrollPosition = { x: scrollMsg.ratioX * peerSession.maxScroll.x, y: scrollMsg.ratioY * peerSession.maxScroll.y };
+          }
           const applyMsg: ScrollApplyMessage = {
             type: "PREVIEW_SCROLL_APPLY",
             sessionId: peerSession.sessionId,
@@ -251,7 +287,7 @@ export class PreviewBridgeController {
           try {
             peerSession.iframe.contentWindow.postMessage(
               applyMsg,
-              peerSession.targetOrigin || "*"
+              peerSession.targetOrigin === "null" ? "*" : peerSession.targetOrigin || "*"
             );
           } catch {}
         }
@@ -275,6 +311,7 @@ export class PreviewBridgeController {
       const navMsg = msg as NavigatedMessage;
       session.lastUrl = navMsg.url;
       session.lastTitle = navMsg.title;
+      this.reportState(session);
 
       if (this.onStatusChange) {
         this.onStatusChange(session.deviceId, true, session.capabilities, {

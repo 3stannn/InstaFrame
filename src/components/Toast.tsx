@@ -17,7 +17,7 @@ interface ToastProps {
 
 export function ToastContainer({ toasts, onDismiss }: ToastProps) {
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+    <div className="fixed bottom-4 right-4 max-w-[calc(100vw-2rem)] z-50 flex flex-col gap-2 pointer-events-none">
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onDismiss={onDismiss} />
       ))}
@@ -39,7 +39,7 @@ function ToastItem({
       onDismiss(toast.id);
     }, duration);
     return () => clearTimeout(timer);
-  }, [toast.id, toast.duration, onDismiss]);
+  }, [toast.id, toast.duration, toast.message, toast.type, onDismiss]);
 
   const icons = {
     success: <CheckCircle2 className="h-4 w-4 text-white" />,
@@ -61,6 +61,7 @@ function ToastItem({
       <span className="font-medium">{toast.message}</span>
       <button
         type="button"
+        aria-label="Dismiss notification"
         onClick={() => onDismiss(toast.id)}
         className="ml-2 text-zinc-500 hover:text-zinc-300"
       >

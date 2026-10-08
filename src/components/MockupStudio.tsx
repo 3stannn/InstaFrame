@@ -29,11 +29,14 @@ import {
 import { renderMockup, FitMode } from "@/lib/compositor";
 import { loadSettings, saveSettings } from "@/lib/storage";
 import { CustomDropdown, DropdownItem } from "@/components/CustomDropdown";
+import { sanitizeAndValidateUrl } from "@/lib/url-validation";
+import { LiveWebsitePreview } from "@/components/LiveWebsitePreview";
+import { type LiveFrameState } from "@/lib/preview-bridge-controller";
+import { getFrameContentHeight } from "@/lib/frame-layout";
+import FRAME_METAS from "../../public/assets/frames/frame-meta.json";
 import { executeScreenshotCapture } from "@/lib/capture-client";
 
 interface MockupStudioProps {
-  isPro: boolean;
-  onOpenLicense: () => void;
   onShowToast: (
     message: string,
     type?: "success" | "error" | "info",
@@ -49,7 +52,13 @@ interface MockupStudioProps {
   };
 }
 
-export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, initialConfig }: MockupStudioProps) {
+export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStudioProps) {
+  const [liveNavigationKey, setLiveNavigationKey] = useState(0);
+  const [liveUrl, setLiveUrl] = useState("");
+  const [previewStage, setPreviewStage] = useState<"live" | "mockup">("live");
+  const [liveReady, setLiveReady] = useState(false);
+  const capturedLiveViewRef = useRef<LiveFrameState | undefined>(undefined);
+  const liveStateRef = useRef<LiveFrameState>({ url: "", scrollX: 0, scrollY: 0, connected: false });
   const [urlInput, setUrlInput] = useState("");
   const [capturedUrl, setCapturedUrl] = useState("");
   const [selectedPreset, setSelectedPreset] = useState("macbook-air-13");
@@ -79,6 +88,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
   const [dragOrigin, setDragOrigin] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageImportGenerationRef = useRef(0);
   const activeCaptureAbortRef = useRef<AbortController | null>(null);
 
   // Restore saved preferences
@@ -86,12 +96,14 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
     const saved = loadSettings();
     if (saved.targetUrl && saved.targetUrl !== "https://schedy-sepia.vercel.app/" && saved.targetUrl !== "https://yourwebsite.com") {
       setUrlInput(saved.targetUrl);
+      setLiveUrl(saved.targetUrl);
       setCapturedUrl(saved.targetUrl);
     }
     if (saved.preset && (DEVICE_PRESETS[saved.preset] || saved.preset === "custom")) {
       setSelectedPreset(saved.preset);
     }
     if (saved.customW) setCustomW(saved.customW);
+    if (saved.customH) setCustomH(saved.customH);
     // Hardware frame is never pre-selected from saved settings on open; defaults to "none" (Raw)
     setSelectedFrame("none");
     if (saved.background) setSelectedBackdrop(saved.background);
@@ -101,83 +113,6 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
     if (typeof saved.autoNotch === "boolean") setAutoNotch(saved.autoNotch);
     if (saved.fitMode) setFitMode(saved.fitMode);
   }, []);
-
-  // Initialize placeholder preview canvas on mount (clearly labeled as not yet captured)
-  useEffect(() => {
-    if (!screenshotDataUrl && !isCapturing) {
-      const canvas = document.createElement("canvas");
-      canvas.width = 1280;
-      canvas.height = 832;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        // Dark studio background
-        ctx.fillStyle = "#09090b";
-        ctx.fillRect(0, 0, 1280, 832);
-
-        // Inner browser preview card
-        ctx.fillStyle = "#18181b";
-        ctx.strokeStyle = "#27272a";
-        ctx.lineWidth = 1.5;
-        if (typeof ctx.roundRect === "function") {
-          ctx.beginPath();
-          ctx.roundRect(140, 100, 1000, 632, 16);
-          ctx.fill();
-          ctx.stroke();
-        } else {
-          ctx.fillRect(140, 100, 1000, 632);
-          ctx.strokeRect(140, 100, 1000, 632);
-        }
-
-        // Window controls
-        ctx.fillStyle = "#ef4444";
-        ctx.beginPath(); ctx.arc(175, 135, 6, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "#eab308";
-        ctx.beginPath(); ctx.arc(195, 135, 6, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "#22c55e";
-        ctx.beginPath(); ctx.arc(215, 135, 6, 0, Math.PI * 2); ctx.fill();
-
-        // Address bar
-        ctx.fillStyle = "#27272a";
-        if (typeof ctx.roundRect === "function") {
-          ctx.beginPath();
-          ctx.roundRect(240, 123, 440, 24, 6);
-          ctx.fill();
-        } else {
-          ctx.fillRect(240, 123, 440, 24);
-        }
-        ctx.fillStyle = "#71717a";
-        ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-        ctx.fillText("Enter URL above to capture", 256, 139);
-
-        // Content
-        ctx.fillStyle = "#f4f4f5";
-        ctx.font = "bold 34px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-        ctx.fillText("Not Yet Captured", 200, 280);
-
-        ctx.fillStyle = "#a1a1aa";
-        ctx.font = "16px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-        ctx.fillText("Enter a website URL above and click Capture to generate a responsive preview.", 200, 325);
-
-        // Action CTA pill
-        ctx.fillStyle = "#27272a";
-        if (typeof ctx.roundRect === "function") {
-          ctx.beginPath();
-          ctx.roundRect(200, 380, 180, 42, 8);
-          ctx.fill();
-        } else {
-          ctx.fillRect(200, 380, 180, 42);
-        }
-
-        ctx.fillStyle = "#a1a1aa";
-        ctx.font = "bold 13.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-        ctx.fillText("Awaiting Capture", 240, 406);
-
-        const initialData = canvas.toDataURL("image/png");
-        setScreenshotDataUrl(initialData);
-        setCaptureSource("url");
-      }
-    }
-  }, [screenshotDataUrl, isCapturing]);
 
   // Memoized dropdown item configs (zero duplicates, matched to extension aesthetic)
   const viewportItems: DropdownItem[] = useMemo(() => {
@@ -217,12 +152,11 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
     return FRAME_OPTIONS.map((f) => ({
       value: f.id,
       label: f.name,
-      meta: f.isPro && !isPro ? "Pro" : f.meta,
+      meta: f.meta,
       section: f.section,
       icon: f.icon,
-      isPro: f.isPro,
     }));
-  }, [isPro]);
+  }, []);
 
   const backdropItems: DropdownItem[] = useMemo(() => {
     return BACKDROP_OPTIONS.map((b) => ({
@@ -246,7 +180,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
   const handlePresetChange = (val: string) => {
     setSelectedPreset(val);
     saveSettings({ preset: val });
-    if (captureSource === "url" && urlInput.trim()) {
+    if (previewStage === "mockup" && captureSource === "url" && urlInput.trim()) {
       handleCaptureUrl(undefined, urlInput, val, selectedFrame);
     }
   };
@@ -260,7 +194,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
     setSelectedZoom(val);
     saveSettings({ zoom: val });
     const target = (capturedUrl || urlInput || "").trim();
-    if (captureSource === "url" && target && target !== "https://yourwebsite.com") {
+    if (previewStage === "mockup" && captureSource === "url" && target && target !== "https://yourwebsite.com") {
       handleCaptureUrl(undefined, target, selectedPreset, selectedFrame, val);
     }
   };
@@ -271,7 +205,8 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
     overrideUrl?: string,
     overridePreset?: string,
     overrideFrame?: string,
-    overrideZoom?: string
+    overrideZoom?: string,
+    liveView?: LiveFrameState
   ) => {
     if (e) e.preventDefault();
     let target = (overrideUrl !== undefined ? overrideUrl : urlInput).trim();
@@ -279,17 +214,20 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
       onShowToast("Please enter a website URL.", "error");
       return;
     }
-    if (!/^https?:\/\//i.test(target)) {
-      target = "https://" + target;
-      setUrlInput(target);
+    const validated = sanitizeAndValidateUrl(target);
+    if (!validated.isValid) {
+      onShowToast(validated.error || "Invalid URL", "error");
+      return;
     }
-    setCapturedUrl(target);
+    target = validated.normalizedUrl;
+    setUrlInput(target);
 
     const presetToUse = overridePreset || selectedPreset;
     const frameToUse = overrideFrame !== undefined ? overrideFrame : selectedFrame;
     const zoomToUse = overrideZoom !== undefined ? overrideZoom : selectedZoom;
+    const capturePosition = liveView || (capturedLiveViewRef.current?.url === target ? capturedLiveViewRef.current : undefined);
 
-    saveSettings({ targetUrl: target, preset: presetToUse, frame: frameToUse, zoom: zoomToUse });
+    saveSettings({ targetUrl: target, preset: presetToUse, frame: frameToUse, zoom: zoomToUse, customW, customH });
 
     // Cancel in-flight capture to avoid stale responses
     if (activeCaptureAbortRef.current) {
@@ -312,18 +250,23 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
         customW,
         customH,
         frameId: frameToUse,
+        scrollX: capturePosition?.scrollX || 0,
+        scrollY: capturePosition?.scrollY || 0,
         zoomLevel: parseInt(zoomToUse, 10) || 100,
         captureFullPage: fullPage,
         captureQuality: "preview",
         settleDelay: 1000,
         signal: abortController.signal,
-      });
+      }, { skipCache: Boolean(capturePosition) || !overridePreset && overrideFrame === undefined && overrideZoom === undefined });
 
       if (abortController.signal.aborted) {
         return; // Request was superseded
       }
 
       if (result.success && result.data) {
+        capturedLiveViewRef.current = capturePosition;
+        setPreviewStage("mockup");
+        setCapturedUrl(target);
         setScreenshotDataUrl(result.data.screenshotBase64);
         setCaptureSource("url");
         setCapturedPreset(presetToUse);
@@ -345,14 +288,59 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
       const msg = err instanceof Error ? err.message : "Network error";
       onShowToast(`Capture failed: ${msg}`, "error", progressId ? { id: progressId } : undefined);
     } finally {
-      setIsCapturing(false);
+      if (activeCaptureAbortRef.current === abortController) {
+        setIsCapturing(false);
+        activeCaptureAbortRef.current = null;
+      }
     }
   };
+
+  const handleOpenLive = (event?: React.FormEvent) => {
+    event?.preventDefault();
+    const validation = sanitizeAndValidateUrl(urlInput);
+    if (!validation.isValid) {
+      onShowToast(validation.error || "Enter a valid website URL.", "error");
+      return;
+    }
+    activeCaptureAbortRef.current?.abort();
+    activeCaptureAbortRef.current = null;
+    setIsCapturing(false);
+    setUrlInput(validation.normalizedUrl);
+    setLiveReady(false);
+    setLiveNavigationKey((value) => value + 1);
+    setLiveUrl(validation.normalizedUrl);
+    setPreviewStage("live");
+    saveSettings({ targetUrl: validation.normalizedUrl });
+  };
+
+  const handleLiveState = useCallback((state: LiveFrameState) => {
+    const previousUrl = liveStateRef.current.url;
+    liveStateRef.current = state;
+    setLiveReady(state.connected);
+    if (state.url && state.url !== previousUrl) setUrlInput(state.url);
+  }, []);
+
+  const handleSnapLive = () => {
+    const state = liveStateRef.current;
+    if (!state.connected) {
+      onShowToast("Wait for the interactive preview to load, or use Capture Screen for this website.", "info");
+      return;
+    }
+    handleCaptureUrl(undefined, state.url || liveUrl, undefined, undefined, undefined, { ...state });
+  };
+
+  const viewportWidth = selectedPreset === "custom" ? Math.max(100, Math.min(7680, customW)) : DEVICE_PRESETS[selectedPreset]?.width || 1280;
+  const frameMeta = FRAME_METAS[selectedFrame as keyof typeof FRAME_METAS];
+  const viewportHeight = frameMeta ? getFrameContentHeight(frameMeta, viewportWidth) : selectedPreset === "custom" ? Math.max(100, Math.min(7680, customH)) : DEVICE_PRESETS[selectedPreset]?.height || 832;
+
+  const captureUrlRef = useRef(handleCaptureUrl);
+  captureUrlRef.current = handleCaptureUrl;
 
   // Handle incoming preloaded configuration from Responsive Studio
   useEffect(() => {
     if (initialConfig) {
       if (initialConfig.url) {
+        setLiveUrl(initialConfig.url);
         setUrlInput(initialConfig.url);
         setCapturedUrl(initialConfig.url);
       }
@@ -361,12 +349,14 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
       }
       if (initialConfig.frameId) setSelectedFrame(initialConfig.frameId);
       if (initialConfig.imageDataUrl) {
+        setPreviewStage("mockup");
         setScreenshotDataUrl(initialConfig.imageDataUrl);
+        capturedLiveViewRef.current = undefined;
         setCaptureSource("screen");
         setCapturedPreset(initialConfig.presetKey || null);
         setFitMode("contain");
       } else if (initialConfig.autoCapture && initialConfig.url) {
-        handleCaptureUrl(
+        captureUrlRef.current(
           undefined,
           initialConfig.url,
           initialConfig.presetKey,
@@ -385,17 +375,8 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
 
   // Re-run composite whenever options, frame, backdrop, or screenshot changes
   // Note: Decoupled from urlInput keystrokes to ensure smooth typing with zero lag
-  const runComposite = useCallback(async () => {
+  const runComposite = useCallback(async (isCurrent: () => boolean) => {
     if (!screenshotDataUrl) return;
-
-    if (selectedFrame !== "none" && !isPro) {
-      setCompositeDataUrl(screenshotDataUrl);
-      const img = new Image();
-      img.onload = () => setCompositeDims(`${img.naturalWidth} × ${img.naturalHeight} px`);
-      img.src = screenshotDataUrl;
-      return;
-    }
-
     setIsCompositing(true);
     try {
       const result = await renderMockup({
@@ -406,27 +387,37 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
         autoNotch: autoNotch,
         notchColor: notchColor,
         fitMode: fitMode,
-        zoomLevel: parseInt(selectedZoom, 10) || 100,
+        zoomLevel: captureSource === "url" ? 100 : parseInt(selectedZoom, 10) || 100,
       });
+      if (!isCurrent()) return;
       setCompositeDataUrl(result);
       const img = new Image();
-      img.onload = () => setCompositeDims(`${img.naturalWidth} × ${img.naturalHeight} px`);
+      img.onload = () => {
+        if (isCurrent()) setCompositeDims(`${img.naturalWidth} × ${img.naturalHeight} px`);
+      };
       img.src = result;
     } catch (err: unknown) {
+      if (!isCurrent()) return;
+      setCompositeDataUrl(null);
       console.error("Composite failed:", err);
       const msg = err instanceof Error ? err.message : "Compositing failed";
       onShowToast(`Failed: ${msg}`, "error");
     } finally {
-      setIsCompositing(false);
+      if (isCurrent()) setIsCompositing(false);
     }
-  }, [screenshotDataUrl, selectedFrame, selectedBackdrop, autoNotch, notchColor, capturedUrl, fitMode, isPro, onShowToast, selectedZoom]);
+  }, [screenshotDataUrl, selectedFrame, selectedBackdrop, autoNotch, notchColor, capturedUrl, fitMode, onShowToast, selectedZoom, captureSource]);
 
   useEffect(() => {
-    runComposite();
+    let active = true;
+    runComposite(() => active);
+    return () => { active = false; };
   }, [runComposite]);
+
+  useEffect(() => () => { activeCaptureAbortRef.current?.abort(); }, []);
 
   // Screen / Tab Capture Web API
   const handleCaptureScreen = async () => {
+    let stream: MediaStream | undefined;
     try {
       if (!navigator.mediaDevices?.getDisplayMedia) {
         onShowToast("Screen capture API not supported in this browser.", "error");
@@ -435,7 +426,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
 
       onShowToast("Select a tab or window to capture...", "info");
 
-      const stream = await navigator.mediaDevices.getDisplayMedia({
+      stream = await navigator.mediaDevices.getDisplayMedia({
         video: { displaySurface: "browser" },
         audio: false,
       });
@@ -458,6 +449,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.drawImage(bitmap, 0, 0);
+          bitmap.close();
           dataUrl = canvas.toDataURL("image/png");
         }
       } else {
@@ -478,42 +470,74 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
       }
 
       if (dataUrl) {
+        activeCaptureAbortRef.current?.abort();
+        activeCaptureAbortRef.current = null;
+        setIsCapturing(false);
+        setPreviewStage("mockup");
         setScreenshotDataUrl(dataUrl);
+        capturedLiveViewRef.current = undefined;
         setCaptureSource("screen");
         setCapturedPreset(null);
         setCapturedUrl("");
         onShowToast("Captured frame successfully!", "success");
       }
     } catch (err: unknown) {
-      const isNotAllowed = err instanceof Error && err.name === "NotAllowedError";
-      if (!isNotAllowed) {
-        const msg = err instanceof Error ? err.message : "Capture cancelled";
-        onShowToast(`Capture cancelled or failed: ${msg}`, "error");
+      if (!(err instanceof Error && err.name === "NotAllowedError")) {
+        onShowToast(`Capture cancelled or failed: ${err instanceof Error ? err.message : "Unknown error"}`, "error");
       }
+    } finally {
+      stream?.getTracks().forEach((track) => track.stop());
     }
   };
+
+  const importImage = useCallback((dataUrl: string, successMessage: string) => {
+    const generation = ++imageImportGenerationRef.current;
+    const image = new Image();
+    image.onload = () => {
+      if (generation !== imageImportGenerationRef.current) return;
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const context = canvas.getContext("2d");
+        if (!context || !canvas.width || !canvas.height) throw new Error("Invalid image dimensions");
+        context.drawImage(image, 0, 0);
+        const png = canvas.toDataURL("image/png");
+        activeCaptureAbortRef.current?.abort();
+        activeCaptureAbortRef.current = null;
+        setIsCapturing(false);
+        setPreviewStage("mockup");
+        setScreenshotDataUrl(png);
+        capturedLiveViewRef.current = undefined;
+        setCaptureSource("upload");
+        setCapturedPreset(null);
+        setCapturedUrl("");
+        onShowToast(successMessage, "success");
+      } catch {
+        onShowToast("Could not import this image. Try a PNG or JPEG file.", "error");
+      }
+    };
+    image.onerror = () => onShowToast("Could not read this image. Try a PNG or JPEG file.", "error");
+    image.src = dataUrl;
+  }, [onShowToast]);
 
   // File Upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
-    reader.onload = (loadEvt) => {
-      const dataUrl = loadEvt.target?.result as string;
-      if (dataUrl) {
-        setScreenshotDataUrl(dataUrl);
-        setCaptureSource("upload");
-        setCapturedPreset(null);
-        onShowToast("Loaded image!", "success");
-      }
+    reader.onload = () => {
+      if (typeof reader.result === "string") importImage(reader.result, "Loaded image!");
     };
+    reader.onerror = () => onShowToast("Could not read image file.", "error");
     reader.readAsDataURL(file);
+    e.target.value = "";
   };
 
   // Clipboard Paste (Ctrl+V / Cmd+V)
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
+      if (!isActive) return;
       const items = e.clipboardData?.items;
       if (!items) return;
 
@@ -524,12 +548,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
             const reader = new FileReader();
             reader.onload = (loadEvt) => {
               const dataUrl = loadEvt.target?.result as string;
-              if (dataUrl) {
-                setScreenshotDataUrl(dataUrl);
-                setCaptureSource("upload");
-                setCapturedPreset(null);
-                onShowToast("Pasted image from clipboard!", "success");
-              }
+              if (dataUrl) importImage(dataUrl, "Pasted image from clipboard!");
             };
             reader.readAsDataURL(file);
             break;
@@ -540,11 +559,11 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
 
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [onShowToast]);
+  }, [onShowToast, isActive, importImage]);
 
   // Copy to clipboard
   const handleCopy = async () => {
-    if (!compositeDataUrl) return;
+    if (!compositeDataUrl || isCompositing || isCapturing) return;
     try {
       const res = await fetch(compositeDataUrl);
       const blob = await res.blob();
@@ -564,7 +583,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
 
   // Download PNG
   const handleDownload = () => {
-    if (!compositeDataUrl) return;
+    if (!compositeDataUrl || isCompositing || isCapturing) return;
     const a = document.createElement("a");
     a.href = compositeDataUrl;
     a.download = `instaframe-${selectedFrame}-${Date.now()}.png`;
@@ -575,14 +594,6 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
   };
 
   const handleFrameSelect = (frameId: string) => {
-    const opt = FRAME_OPTIONS.find((f) => f.id === frameId);
-    if (opt?.isPro && !isPro) {
-      onShowToast("Mockup frames require a Pro license.", "error");
-      onOpenLicense();
-      setSelectedFrame("none");
-      saveSettings({ frame: "none" });
-      return;
-    }
     setSelectedFrame(frameId);
     saveSettings({ frame: frameId });
 
@@ -605,7 +616,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
     if (matchingPresetKey) {
       setSelectedPreset(matchingPresetKey);
       saveSettings({ preset: matchingPresetKey });
-      if (captureSource === "url" && urlInput.trim()) {
+      if (previewStage === "mockup" && captureSource === "url" && urlInput.trim()) {
         handleCaptureUrl(undefined, urlInput, matchingPresetKey, frameId);
       }
     }
@@ -674,7 +685,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
   };
 
   return (
-    <div className="flex flex-1 flex-col lg:flex-row overflow-hidden bg-zinc-950">
+    <div className="flex min-h-0 flex-1 flex-col lg:flex-row overflow-auto lg:overflow-hidden bg-zinc-950">
       {/* Settings & Controls Sidebar */}
       <div className="w-full lg:w-80 flex-shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-800 bg-zinc-950 p-3.5 overflow-y-auto space-y-3.5">
         {/* Source URL & Capture */}
@@ -685,7 +696,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
             </span>
           </div>
 
-          <form onSubmit={handleCaptureUrl} className="space-y-2">
+          <form aria-label="Open live website" onSubmit={handleOpenLive} className="space-y-2">
             <div className="relative flex items-center">
               <Globe className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-zinc-500" />
               <input
@@ -720,11 +731,14 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
               ) : (
                 <>
                   <Camera className="h-3.5 w-3.5 text-zinc-900" />
-                  <span>Capture &amp; Mockup</span>
+                  <span>Open website</span>
                 </>
               )}
             </button>
           </form>
+          <button type="button" onClick={handleSnapLive} disabled={!liveUrl || !liveReady || isCapturing} className="flex w-full items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-800 py-2 text-xs font-semibold text-white hover:bg-zinc-700 disabled:opacity-40">
+            <Camera className="h-3.5 w-3.5" />{isCapturing ? "Snapping…" : "Snap view"}
+          </button>
 
           {/* Alternative Ingestion Buttons */}
           <div className="flex items-center gap-1.5">
@@ -834,9 +848,6 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
             <span className="text-[10.5px] font-semibold uppercase tracking-wider text-zinc-400">
               Frame &amp; Presentation
             </span>
-            <span className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 text-[9px] font-semibold text-zinc-200">
-              PRO
-            </span>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -945,11 +956,15 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
       </div>
 
       {/* Canvas Mockup Preview Surface */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-[420px] lg:min-h-0 flex-1 flex-col overflow-hidden">
         {/* Preview Topbar */}
-        <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-950 px-4 py-2">
+          <div className="flex items-center gap-1 rounded-md border border-zinc-800 p-0.5 text-xs">
+            <button type="button" onClick={() => setPreviewStage("live")} disabled={!liveUrl} className={`rounded px-2 py-1 disabled:opacity-40 ${previewStage === "live" ? "bg-white text-zinc-950" : "text-zinc-400"}`}>Live website</button>
+            <button type="button" onClick={() => setPreviewStage("mockup")} className={`rounded px-2 py-1 ${previewStage === "mockup" ? "bg-white text-zinc-950" : "text-zinc-400"}`}>Mockup</button>
+          </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold text-zinc-300">Mockup Preview</span>
+            <span className="text-xs font-semibold text-zinc-300">{previewStage === "live" ? "Live preview" : "Mockup preview"}</span>
             {compositeDims && (
               <span className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[10.5px] font-mono tabular-nums text-zinc-400">
                 {compositeDims}
@@ -1030,7 +1045,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
             <button
               type="button"
               onClick={handleCopy}
-              disabled={!compositeDataUrl || isCompositing}
+              disabled={!compositeDataUrl || isCompositing || isCapturing}
               className="flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1 text-xs font-medium text-zinc-200 transition-all hover:border-zinc-700 hover:text-white active:scale-95 disabled:opacity-40"
             >
               {copySuccess ? <Check className="h-3.5 w-3.5 text-white" /> : <Copy className="h-3.5 w-3.5" />}
@@ -1041,13 +1056,17 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
             <button
               type="button"
               onClick={handleDownload}
-              disabled={!compositeDataUrl || isCompositing}
+              disabled={!compositeDataUrl || isCompositing || isCapturing}
               className="flex items-center gap-1.5 rounded-md bg-white px-3 py-1 text-xs font-semibold text-zinc-950 shadow-sm transition-all hover:bg-zinc-200 active:scale-95 disabled:opacity-40"
             >
               <Download className="h-3.5 w-3.5" />
               <span>Download PNG</span>
             </button>
           </div>
+        </div>
+
+        <div className={`min-h-0 flex-1 flex-col ${previewStage === "live" && liveUrl ? "flex" : "hidden"}`}>
+          {liveUrl && <LiveWebsitePreview key={liveNavigationKey} url={liveUrl} width={viewportWidth} height={viewportHeight} zoom={canvasZoom} pageZoom={parseInt(selectedZoom, 10) || 100} onStateChange={handleLiveState} />}
         </div>
 
         {/* Live Canvas Viewport */}
@@ -1059,7 +1078,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onDoubleClick={handleDoubleClick}
-          className={`studio-grid-bg relative flex flex-1 items-center justify-center overflow-hidden p-6 select-none ${
+          className={`studio-grid-bg relative ${previewStage === "live" && liveUrl ? "hidden" : "flex"} flex-1 items-center justify-center overflow-hidden p-6 select-none ${
             isDragging ? "cursor-grabbing" : "cursor-grab"
           }`}
         >
@@ -1099,7 +1118,7 @@ export function MockupStudio({ isPro, onOpenLicense, onShowToast, isActive, init
             </div>
           ) : (
             <div className="text-center text-zinc-500 text-xs pointer-events-none">
-              Enter a website URL and click &ldquo;Capture &amp; Mockup&rdquo; to render your mockup.
+              Open a website, scroll or follow links, then click Snap view to create your mockup.
             </div>
           )}
 

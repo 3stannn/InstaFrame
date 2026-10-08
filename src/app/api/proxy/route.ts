@@ -1,5 +1,9 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
+import { escapeHtml, scriptString } from "@/lib/proxy-utils";
 import { validateUrlSafe, safeFetch } from "@/lib/ssrf";
+import { previewAssetUrl, rewritePreviewCss, rewritePreviewModule } from "@/lib/preview-assets";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +31,7 @@ function resolveSrcset(srcset: string, baseUrl: URL): string {
     .join(", ");
 }
 
-export async function GET(request: NextRequest) {
+async function handlePreview(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const targetUrl = searchParams.get("url");
 
@@ -44,16 +48,25 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const parsedUrl = validation.parsedUrl;
+  let parsedUrl = validation.parsedUrl;
+  const previewOrigin = new URL(`${request.nextUrl.protocol}//${request.headers.get("host") || request.nextUrl.host}`).origin;
+  const proxyEndpoint = `${previewOrigin}/api/proxy`;
 
   try {
+    const requestBody = request.method === "POST" ? await request.text() : undefined;
+    if (requestBody && Buffer.byteLength(requestBody) > 1024 * 1024) {
+      return new NextResponse("Preview request is too large", { status: 413 });
+    }
     const userAgent =
       request.headers.get("user-agent") ||
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
     // 2. Fetch using safeFetch (enforces manual redirect validation & timeout)
     const upstreamResponse = await safeFetch(parsedUrl.toString(), {
+      method: request.method,
+      ...(requestBody !== undefined ? { body: requestBody } : {}),
       headers: {
+        ...(request.headers.get("content-type") ? { "Content-Type": request.headers.get("content-type")! } : {}),
         "User-Agent": userAgent,
         Accept:
           request.headers.get("accept") ||
@@ -67,8 +80,11 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    const requestedHash = parsedUrl.hash;
+    if (upstreamResponse.url) parsedUrl = new URL(upstreamResponse.url);
+    if (!parsedUrl.hash) parsedUrl.hash = requestedHash;
     const contentType = upstreamResponse.headers.get("content-type") || "";
-    const isHtml = contentType.toLowerCase().includes("text/html");
+    const isHtml = /text\/html|application\/xhtml\+xml/i.test(contentType);
 
     if (isHtml) {
       let html = await upstreamResponse.text();
@@ -110,25 +126,101 @@ export async function GET(request: NextRequest) {
       );
 
       // Set base tag for relative assets
-      const basePath = parsedUrl.pathname.endsWith("/") || parsedUrl.pathname.includes(".")
-        ? parsedUrl.pathname
-        : `${parsedUrl.pathname}/`;
-      const baseTag = `<base href="${parsedUrl.origin}${basePath}" />`;
-      const proxyEndpoint = `${request.nextUrl.origin}/api/proxy`;
+      const baseTag = `<base href="${escapeHtml(parsedUrl.toString())}" />`;
+      // Existing base tags must not override the upstream page location.
+      html = html.replace(/<base\b[^>]*>/gi, "");
+      // Next may normalize the hostname to localhost; use the browser's host.
+      html = html.replace(/<(script|link)\b[^>]*>/gi, tag => tag.replace(/\b(src|href)=(["'])([^"']+)\2/gi,
+        (_, attribute, quote, value) => `${attribute}=${quote}${escapeHtml(previewAssetUrl(value.replace(/&amp;/g, "&"), parsedUrl.href, proxyEndpoint))}${quote}`));
+      html = html.replace(/<style\b([^>]*)>([\s\S]*?)<\/style>/gi, (_, attrs, css) => `<style${attrs}>${rewritePreviewCss(css, parsedUrl.href, proxyEndpoint)}</style>`);
+      html = html.replace(/<script\b([^>]*type=["']module["'][^>]*)>([\s\S]*?)<\/script>/gi, (_, attrs, source) => `<script${attrs}>${rewritePreviewModule(source, parsedUrl.href, proxyEndpoint)}</script>`);
+      const bridgeSource = await readFile(path.join(process.cwd(), "public", "preview-bridge.js"), "utf8");
+      // Inline the bridge so opaque-origin previews also work on localhost.
+      const bridgeTag = `<script data-allowed-origins="${escapeHtml(previewOrigin)}">${bridgeSource.replace(/<\/script/gi, "<\\/script")}</script>`;
 
       // Injected runtime script for:
       // 1. Mobile scrollbar suppression
       // 2. Comprehensive lazy-image hydration (swapping data-src, data-lazy-src, data-original)
       // 3. Scroll & resize listener to trigger IntersectionObservers
-      // 4. Safe fetch and XHR proxy interception (GET/HEAD only to avoid 405s)
+      // 4. Fetch and XHR proxy interception for public page data
       // 5. Intra-frame navigation interception
       // 6. Scroll sync and frame readiness announcement
       const injectedScript = `
         <script>
           (function() {
-            var targetOrigin = "${parsedUrl.origin}";
-            var targetBase = "${parsedUrl.origin}${parsedUrl.pathname}";
-            var proxyEndpoint = "${proxyEndpoint}";
+            var targetOrigin = ${scriptString(parsedUrl.origin)};
+            var targetBase = ${scriptString(parsedUrl.toString())};
+            var proxyEndpoint = ${scriptString(proxyEndpoint)};
+            window.__INSTAFRAME_TARGET_URL__ = targetBase;
+            var previewLocation = {};
+            function navigatePreview(value) {
+              window.location.href = proxyEndpoint + '?url=' + encodeURIComponent(new URL(value, window.__INSTAFRAME_TARGET_URL__).href);
+            }
+            ['href', 'pathname', 'search', 'hash', 'origin', 'host', 'hostname', 'protocol', 'port'].forEach(function(key) {
+              Object.defineProperty(previewLocation, key, { get: function() { return new URL(window.__INSTAFRAME_TARGET_URL__)[key]; },
+                set: function(value) { var next = new URL(window.__INSTAFRAME_TARGET_URL__); next[key] = value; navigatePreview(next.href); } });
+            });
+            previewLocation.assign = navigatePreview;
+            previewLocation.replace = navigatePreview;
+            previewLocation.reload = function() { window.location.reload(); };
+            previewLocation.toString = function() { return previewLocation.href; };
+            window.__INSTAFRAME_LOCATION__ = previewLocation;
+            window.__INSTAFRAME_READ_LOCATION__ = function(value) {
+              return value === window || value === document ? previewLocation : value.location;
+            };
+            function assetAddress(value) {
+              value = String(value).replace(new RegExp('^/(https?://)'), '$1');
+              var proxyIndex = value.indexOf(proxyEndpoint + '?');
+              if (proxyIndex >= 0) return value.slice(proxyIndex);
+              if (value.indexOf(proxyEndpoint + '?') === 0 || /^(data:|blob:)/.test(value)) return value;
+              return proxyEndpoint + '?asset=1&url=' + encodeURIComponent(new URL(value, targetBase).href);
+            }
+            [[HTMLScriptElement.prototype, 'src'], [HTMLLinkElement.prototype, 'href']].forEach(function(entry) {
+              var descriptor = Object.getOwnPropertyDescriptor(entry[0], entry[1]);
+              if (descriptor && descriptor.set) Object.defineProperty(entry[0], entry[1], Object.assign({}, descriptor, {
+                set: function(value) { descriptor.set.call(this, assetAddress(value)); }
+              }));
+            });
+            var originalAttribute = Element.prototype.setAttribute;
+            Element.prototype.setAttribute = function(name, value) {
+              if ((this.tagName === 'SCRIPT' && name.toLowerCase() === 'src') || (this.tagName === 'LINK' && name.toLowerCase() === 'href')) value = assetAddress(value);
+              return originalAttribute.call(this, name, value);
+            };
+            ['pushState', 'replaceState'].forEach(function(method) {
+              var original = history[method];
+              history[method] = function(state, title, url) {
+                if (url != null) window.__INSTAFRAME_TARGET_URL__ = new URL(url, window.__INSTAFRAME_TARGET_URL__).href;
+                return original.call(history, Object.assign({}, state, { __instaframe_url: window.__INSTAFRAME_TARGET_URL__ }), title);
+              };
+            });
+            window.addEventListener('popstate', function(event) {
+              if (event.state && event.state.__instaframe_url) window.__INSTAFRAME_TARGET_URL__ = event.state.__instaframe_url;
+            });
+
+            // Keep website storage isolated while supporting scripts that expect it.
+            // Opaque sandbox origins cannot access the browser's cookie/storage APIs.
+            var previewCookies = '';
+            try { document.cookie; } catch(e) {
+              Object.defineProperty(document, 'cookie', { configurable: true,
+                get: function() { return previewCookies; },
+                set: function(value) {
+                  var pair = String(value).split(';')[0];
+                  var name = pair.split('=')[0];
+                  previewCookies = previewCookies.split('; ').filter(function(item) { return item && item.split('=')[0] !== name; }).concat(pair).join('; ');
+                }
+              });
+            }
+            ['localStorage', 'sessionStorage'].forEach(function(key) {
+              try { window[key].getItem('instaframe-storage-check'); } catch(e) {
+                var values = Object.create(null);
+                var storage = { getItem: function(k) { return Object.prototype.hasOwnProperty.call(values, k) ? values[k] : null; },
+                  setItem: function(k, v) { values[String(k)] = String(v); },
+                  removeItem: function(k) { delete values[k]; }, clear: function() { values = Object.create(null); },
+                  key: function(i) { return Object.keys(values)[i] || null; } };
+                Object.defineProperty(storage, 'length', { get: function() { return Object.keys(values).length; } });
+                Object.defineProperty(window, key, { configurable: true, value: storage });
+              }
+            });
 
             // 1. Scrollbar suppression
             try {
@@ -181,13 +273,13 @@ export async function GET(request: NextRequest) {
             setTimeout(hydrateLazyImages, 500);
             setTimeout(hydrateLazyImages, 1500);
 
-            // 3. Intercept fetch to route background GET/HEAD requests only (prevents 405 on POST)
+            // 3. Load background page data without forwarding studio credentials.
             var _origFetch = window.fetch;
             if (_origFetch) {
               window.fetch = function(resource, init) {
                 try {
-                  var method = (init && init.method ? init.method : 'GET').toUpperCase();
-                  if (method !== 'GET' && method !== 'HEAD') {
+                  var method = (init && init.method ? init.method : resource && resource.method || 'GET').toUpperCase();
+                  if (method !== 'GET' && method !== 'HEAD' && method !== 'POST') {
                     return _origFetch.apply(this, arguments);
                   }
                   var urlStr = null;
@@ -201,7 +293,8 @@ export async function GET(request: NextRequest) {
                     if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
                       if (!resolved.includes('/api/proxy?url=')) {
                         var proxied = proxyEndpoint + '?url=' + encodeURIComponent(resolved);
-                        return _origFetch.call(this, proxied, init);
+                        var options = Object.assign({}, init, { credentials: 'omit', mode: 'cors' });
+                        return _origFetch.call(this, resource instanceof Request ? new Request(proxied, resource) : proxied, options);
                       }
                     }
                   }
@@ -210,12 +303,12 @@ export async function GET(request: NextRequest) {
               };
             }
 
-            // 4. Intercept XMLHttpRequest for GET/HEAD only
+            // 4. Intercept XMLHttpRequest for supported page-data methods.
             var _origOpen = XMLHttpRequest.prototype.open;
             XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
               try {
                 var m = (method || 'GET').toUpperCase();
-                if (m === 'GET' || m === 'HEAD') {
+                if (m === 'GET' || m === 'HEAD' || m === 'POST') {
                   if (typeof url === 'string' && !url.startsWith('data:') && !url.startsWith('blob:')) {
                     var resolved = new URL(url, targetBase).toString();
                     if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
@@ -235,9 +328,17 @@ export async function GET(request: NextRequest) {
               while (el && el.tagName !== 'A') {
                 el = el.parentElement;
               }
-              if (el && el.href) {
+              if (el && el.href && !e.defaultPrevented && e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !el.hasAttribute('download')) {
                 try {
                   var resolvedHref = new URL(el.href, targetBase).toString();
+                  var destination = new URL(resolvedHref);
+                  var current = new URL(window.__INSTAFRAME_TARGET_URL__ || targetBase);
+                  if (destination.origin === current.origin && destination.pathname === current.pathname && destination.search === current.search && destination.hash) {
+                    e.preventDefault();
+                    window.__INSTAFRAME_TARGET_URL__ = resolvedHref;
+                    window.location.hash = destination.hash;
+                    return;
+                  }
                   if (resolvedHref.startsWith('http://') || resolvedHref.startsWith('https://')) {
                     e.preventDefault();
                     window.location.href = proxyEndpoint + '?url=' + encodeURIComponent(resolvedHref);
@@ -245,6 +346,14 @@ export async function GET(request: NextRequest) {
                 } catch(err) {}
               }
             }, true);
+
+            // Honor anchors when the original URL includes a fragment.
+            document.addEventListener('DOMContentLoaded', function() {
+              try {
+                var fragment = new URL(targetBase).hash;
+                if (fragment) document.getElementById(decodeURIComponent(fragment.slice(1)))?.scrollIntoView();
+              } catch(e) {}
+            });
 
             // 6. Scroll sync & frame ready message
             window.addEventListener('message', function(e) {
@@ -255,52 +364,58 @@ export async function GET(request: NextRequest) {
 
             try {
               if (window.parent && window.parent !== window) {
-                window.parent.postMessage({ type: 'INSTAFRAME_FRAME_READY', url: "${parsedUrl.toString()}" }, '*');
+                window.parent.postMessage({ type: 'INSTAFRAME_FRAME_READY', url: ${scriptString(parsedUrl.toString())} }, '*');
               }
             } catch(e) {}
           })();
         </script>
       `;
 
-      if (html.includes("<head>")) {
-        html = html.replace("<head>", `<head>${baseTag}${injectedScript}`);
-      } else if (html.includes("<html>")) {
-        html = html.replace("<html>", `<html><head>${baseTag}${injectedScript}</head>`);
+      if (/<head\b[^>]*>/i.test(html)) {
+        html = html.replace(/<head\b[^>]*>/i, (head) => `${head}${baseTag}${injectedScript}${bridgeTag}`);
+      } else if (/<html\b[^>]*>/i.test(html)) {
+        html = html.replace(/<html\b[^>]*>/i, (tag) => `${tag}<head>${baseTag}${injectedScript}${bridgeTag}</head>`);
       } else {
-        html = `<head>${baseTag}${injectedScript}</head>${html}`;
+        html = `<head>${baseTag}${injectedScript}${bridgeTag}</head>${html}`;
       }
 
       const response = new NextResponse(html, {
         status: upstreamResponse.status,
         headers: {
           "Content-Type": "text/html; charset=utf-8",
+          "Content-Security-Policy": "sandbox allow-scripts allow-forms allow-popups",
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Methods": "GET, POST, OPTIONS, HEAD",
           "Access-Control-Allow-Headers": "*",
-          "Cache-Control": "public, max-age=60, s-maxage=60, stale-while-revalidate=300",
+          "Cache-Control": "no-store",
         },
       });
 
       response.headers.delete("x-frame-options");
-      response.headers.delete("content-security-policy");
       response.headers.delete("content-security-policy-report-only");
 
       return response;
     }
 
     // Binary / Asset streaming with appropriate Content-Type and open CORS
-    const buffer = await upstreamResponse.arrayBuffer();
-    const response = new NextResponse(buffer, {
+    const buffer = /text\/css/i.test(contentType)
+      ? rewritePreviewCss(await upstreamResponse.text(), parsedUrl.href, proxyEndpoint)
+      : /(?:javascript|ecmascript)/i.test(contentType)
+        ? rewritePreviewModule(await upstreamResponse.text(), parsedUrl.href, proxyEndpoint)
+        : await upstreamResponse.arrayBuffer();
+    const response = new NextResponse([204, 205, 304].includes(upstreamResponse.status) ? null : buffer, {
       status: upstreamResponse.status,
       headers: {
         "Content-Type": contentType || "application/octet-stream",
+        "Content-Security-Policy": "sandbox allow-scripts allow-forms allow-popups",
         "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, max-age=3600",
+        "Access-Control-Allow-Private-Network": "true",
+        "Cache-Control": "no-store",
       },
     });
 
     response.headers.delete("x-frame-options");
-    response.headers.delete("content-security-policy");
+
 
     return response;
   } catch (err: unknown) {
@@ -378,10 +493,10 @@ export async function GET(request: NextRequest) {
         <div class="card">
           <div class="icon">⚠️</div>
           <h2>${isTimeout ? "Connection Timed Out" : "Unable to Connect"}</h2>
-          <p>${targetUrl}</p>
+          <p>${escapeHtml(targetUrl)}</p>
           <div class="btn-group">
             <button class="btn-primary" onclick="window.location.reload()">Retry Viewport</button>
-            <a class="btn-secondary" href="${targetUrl}" target="_blank" rel="noreferrer">Open in New Tab</a>
+            <a class="btn-secondary" href="${escapeHtml(targetUrl)}" target="_blank" rel="noreferrer">Open in New Tab</a>
           </div>
         </div>
         <script>
@@ -397,8 +512,21 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
+          "Content-Security-Policy": "sandbox allow-scripts allow-forms allow-popups",
         "Access-Control-Allow-Origin": "*",
       },
     });
   }
+}
+
+export const GET = handlePreview;
+export const POST = handlePreview;
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "*",
+    "Access-Control-Allow-Private-Network": "true",
+  } });
 }

@@ -178,7 +178,7 @@ export function DeviceFrame({
                   ? "bg-zinc-400 animate-pulse"
                   : previewMode === "preview" && isSnapshotLoading
                   ? "bg-zinc-400 animate-pulse"
-                  : "bg-white"
+                  : "bg-zinc-100"
               }`}
               title={
                 previewMode === "live" && iframeLoading
@@ -363,7 +363,7 @@ export function DeviceFrame({
                 </div>
                 <button
                   type="submit"
-                  className="mt-3.5 flex items-center justify-center rounded bg-white p-1.5 text-zinc-950 hover:bg-zinc-200 transition-colors font-semibold"
+                  className="mt-3.5 flex items-center justify-center rounded bg-zinc-100 p-1.5 text-zinc-950 hover:bg-zinc-200 transition-colors font-semibold"
                   title="Apply dimensions"
                 >
                   <Check className="h-3.5 w-3.5" />

@@ -205,7 +205,7 @@ export function CustomDropdown({
                       }}
                       className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-all duration-100 ${
                         isSelected
-                          ? "bg-white font-semibold text-zinc-900 shadow-sm"
+                          ? "bg-zinc-100 font-semibold text-zinc-950 shadow-sm"
                           : "text-zinc-300 hover:bg-zinc-800/80 hover:text-zinc-100"
                       }`}
                     >

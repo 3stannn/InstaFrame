@@ -3,13 +3,19 @@
 @tailwind utilities;
 
 :root {
-  --background: #09090b;
-  --foreground: #f4f4f5;
-  --card: #121215;
-  --card-subtle: #18181b;
-  --border: #27272a;
-  --muted: #71717a;
-  --accent: #ffffff;
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-subtle: #fafafa;
+  --border: #e6e6e6;
+  --muted: #6b6b6b;
+  --accent: #0a0a0a;
+  --paper: #ffffff;
+  --paper-2: #fafafa;
+  --paper-3: #f4f4f4;
+  --ink: #0a0a0a;
+  --blue: #2563eb;
+  --grid-line: rgba(10, 10, 10, 0.055);
 }
 
 * {
@@ -20,7 +26,7 @@ html,
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Inter, system-ui, sans-serif;
+  font-family: "Geist", "Helvetica Neue", Arial, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   margin: 0;
@@ -44,15 +50,63 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
-  border-radius: 9999px;
+  background: #c9c9c9;
+  border-radius: 0;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+  background: #8a8a8a;
 }
 
 /* Studio Canvas background */
 .studio-grid-bg {
-  background-color: #09090b;
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+button,
+input,
+select {
+  border-radius: 0 !important;
+}
+
+/* The reference system uses square containers throughout. Keep `rounded-full`
+   available for semantic dots, radio marks, and swatches only. */
+.rounded,
+.rounded-sm,
+.rounded-md,
+.rounded-lg,
+.rounded-xl,
+.rounded-2xl {
+  border-radius: 0 !important;
+}
+
+button[role="switch"],
+button[role="switch"] > span {
+  border-radius: 0 !important;
+}
+
+.font-mono,
+code,
+kbd {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.02em;
+}
+
+/* Editorial utility details inspired by the reference system. */
+.editorial-label {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.editorial-serif {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 400;
 }

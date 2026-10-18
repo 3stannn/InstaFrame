@@ -789,7 +789,7 @@ export function ResponsiveStudio({
 
             <button
               type="submit"
-              className="flex items-center rounded-md bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-100 active:scale-95 shadow-sm shrink-0"
+              className="flex items-center rounded-md bg-zinc-100 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200 active:scale-95 shadow-sm shrink-0"
             >
               <span>Go</span>
             </button>
@@ -808,8 +808,8 @@ export function ResponsiveStudio({
         <div className="flex items-center gap-3 shrink-0">
           {/* Layout Mode (Row vs Grid) */}
           <div className="flex items-center rounded-md border border-zinc-800 bg-zinc-900/90 p-0.5 text-xs">
-            <button type="button" onClick={() => setPreviewMode("live")} className={`rounded px-2 py-1 ${previewMode === "live" ? "bg-white text-zinc-950" : "text-zinc-400"}`}>Live</button>
-            <button type="button" onClick={() => setPreviewMode("preview")} className={`rounded px-2 py-1 ${previewMode === "preview" ? "bg-white text-zinc-950" : "text-zinc-400"}`}>Snapshot</button>
+            <button type="button" onClick={() => setPreviewMode("live")} className={`rounded px-2 py-1 ${previewMode === "live" ? "bg-zinc-100 text-zinc-950" : "text-zinc-400"}`}>Live</button>
+            <button type="button" onClick={() => setPreviewMode("preview")} className={`rounded px-2 py-1 ${previewMode === "preview" ? "bg-zinc-100 text-zinc-950" : "text-zinc-400"}`}>Snapshot</button>
           </div>
           <div className="flex items-center rounded-md border border-zinc-800 bg-zinc-900/90 p-0.5 text-xs">
             <button
@@ -821,7 +821,7 @@ export function ResponsiveStudio({
               title="Row: viewports in a single horizontal row"
               className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-all ${
                 layoutMode === "row"
-                  ? "bg-white text-zinc-950 font-semibold shadow-sm"
+                  ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
                   : "text-zinc-400 hover:text-zinc-200 font-medium"
               }`}
             >
@@ -837,7 +837,7 @@ export function ResponsiveStudio({
               title="Grid: wrap viewports into a responsive multi-row grid"
               className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-all ${
                 layoutMode === "wrap"
-                  ? "bg-white text-zinc-950 font-semibold shadow-sm"
+                  ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
                   : "text-zinc-400 hover:text-zinc-200 font-medium"
               }`}
             >
@@ -855,7 +855,7 @@ export function ResponsiveStudio({
               onClick={() => setSyncScroll(!syncScroll)}
               className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-150 ease-in-out focus:outline-none ${
                 syncScroll
-                  ? "border-white bg-white"
+                  ? "border-zinc-100 bg-zinc-100"
                   : "border-zinc-700 bg-zinc-800 hover:border-zinc-600"
               }`}
             >
@@ -884,7 +884,7 @@ export function ResponsiveStudio({
               }}
               className={`rounded px-2.5 py-1 text-xs transition-all ${
                 currentScale === "auto"
-                  ? "bg-white text-zinc-950 font-semibold shadow-sm"
+                  ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
                   : "text-zinc-400 hover:text-zinc-200 font-medium"
               }`}
             >
@@ -895,7 +895,7 @@ export function ResponsiveStudio({
               onClick={() => setCurrentScale(1)}
               className={`rounded px-2.5 py-1 text-xs transition-all ${
                 currentScale === 1
-                  ? "bg-white text-zinc-950 font-semibold shadow-sm"
+                  ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
                   : "text-zinc-400 hover:text-zinc-200 font-medium"
               }`}
             >
@@ -906,7 +906,7 @@ export function ResponsiveStudio({
               onClick={() => setCurrentScale(0.75)}
               className={`rounded px-2.5 py-1 text-xs transition-all ${
                 currentScale === 0.75
-                  ? "bg-white text-zinc-950 font-semibold shadow-sm"
+                  ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
                   : "text-zinc-400 hover:text-zinc-200 font-medium"
               }`}
             >
@@ -917,7 +917,7 @@ export function ResponsiveStudio({
               onClick={() => setCurrentScale(0.5)}
               className={`rounded px-2.5 py-1 text-xs transition-all ${
                 currentScale === 0.5
-                  ? "bg-white text-zinc-950 font-semibold shadow-sm"
+                  ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
                   : "text-zinc-400 hover:text-zinc-200 font-medium"
               }`}
             >

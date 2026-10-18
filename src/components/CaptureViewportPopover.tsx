@@ -258,7 +258,7 @@ export function CaptureViewportPopover({
           data-action="capture-submit-btn"
           type="button"
           onClick={handleAction}
-          className="flex items-center gap-1.5 rounded bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-950 transition-colors hover:bg-white"
+          className="flex items-center gap-1.5 rounded bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-950 transition-colors hover:bg-zinc-200"
         >
           <Camera className="h-3.5 w-3.5" />
           <span>Capture</span>

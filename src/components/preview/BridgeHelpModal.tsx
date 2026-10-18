@@ -124,7 +124,7 @@ export function BridgeHelpModal({ isOpen, onClose, viewerOrigin }: BridgeHelpMod
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md bg-zinc-100 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-white transition-colors"
+            className="rounded-md bg-zinc-100 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-colors"
           >
             Got it
           </button>

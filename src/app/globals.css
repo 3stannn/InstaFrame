@@ -15,7 +15,6 @@
   --paper-3: #f4f4f4;
   --ink: #0a0a0a;
   --blue: #2563eb;
-  --grid-line: rgba(10, 10, 10, 0.055);
 }
 
 * {
@@ -59,12 +58,8 @@ body {
 }
 
 /* Studio Canvas background */
-.studio-grid-bg {
+.studio-canvas-bg {
   background-color: var(--paper);
-  background-image:
-    linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-  background-size: 48px 48px;
 }
 
 button,

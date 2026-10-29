@@ -171,7 +171,7 @@ export function CaptureViewportPopover({
         <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1 block">
           Output
         </label>
-        <div className="grid grid-cols-2 gap-1 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
+        <div className="flex flex-col gap-1 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
           <button
             data-action="output-mockup-option"
             type="button"

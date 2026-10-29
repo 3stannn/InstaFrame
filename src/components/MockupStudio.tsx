@@ -850,7 +850,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-3">
             {/* Frame Select */}
             <div>
               <label className="block text-[10px] font-medium text-zinc-500 mb-1">Hardware Frame</label>
@@ -879,7 +879,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
           {/* Canvas Fit Mode */}
           <div>
             <label className="block text-[10px] font-medium text-zinc-400 mb-1">Canvas Screen Fitting</label>
-            <div className="grid grid-cols-2 gap-1 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
+            <div className="flex flex-col gap-1 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
               <button
                 type="button"
                 onClick={() => {
@@ -1078,7 +1078,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onDoubleClick={handleDoubleClick}
-          className={`studio-grid-bg relative ${previewStage === "live" && liveUrl ? "hidden" : "flex"} flex-1 items-center justify-center overflow-hidden p-6 select-none ${
+          className={`studio-canvas-bg relative ${previewStage === "live" && liveUrl ? "hidden" : "flex"} flex-1 items-center justify-center overflow-hidden p-6 select-none ${
             isDragging ? "cursor-grabbing" : "cursor-grab"
           }`}
         >

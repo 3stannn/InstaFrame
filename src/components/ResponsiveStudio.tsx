@@ -17,7 +17,7 @@ import {
   Layers,
   ArrowLeft,
   Columns,
-  LayoutGrid,
+  Rows3,
 } from "lucide-react";
 import { DEVICE_PRESETS, DEVICE_CATEGORIES } from "@/lib/devices";
 import { CaptureOutputOption } from "./CaptureViewportPopover";
@@ -530,22 +530,11 @@ export function ResponsiveStudio({
         const fit = Math.min(1.0, Math.max(0.12, Math.min(scaleX, scaleY)));
         setComputedScale(fit);
       } else {
-        // In grid/wrap mode:
-        // Calculate scale so devices wrap into a clean, readable multi-row layout
-        const numDevices = activeDevices.length;
+        // Keep the stored "wrap" preference compatible with the vertical stack.
+        // Fit each viewport independently; the canvas scrolls down the list.
         const maxHeight = activeDevices.reduce((max, d) => Math.max(max, d.height + 38), 0);
-        const totalDeviceWidth = activeDevices.reduce((sum, d) => sum + d.width + 2, 0);
-
-        const cols = numDevices <= 2 ? numDevices : Math.min(numDevices, Math.max(2, Math.round(Math.sqrt(numDevices * (canvasW / canvasH)))));
-        const rows = Math.ceil(numDevices / cols);
-
-        const avgWidth = totalDeviceWidth / numDevices;
-        const gridW = cols * avgWidth + (cols - 1) * 32;
-        const gridH = rows * maxHeight + (rows - 1) * 32;
-
-        const scaleX = canvasW / gridW;
-        const scaleY = canvasH / gridH;
-        const fit = Math.min(1.0, Math.max(0.2, Math.min(scaleX, scaleY)));
+        const maxWidth = activeDevices.reduce((max, d) => Math.max(max, d.width + 2), 0);
+        const fit = Math.min(1, Math.max(0.12, Math.min(canvasW / maxWidth, canvasH / maxHeight)));
         setComputedScale(fit);
       }
 
@@ -806,7 +795,7 @@ export function ResponsiveStudio({
 
         {/* Right Side Controls: Layout Mode Toggle + Sync Scroll + Zoom Segmented Control */}
         <div className="flex items-center gap-3 shrink-0">
-          {/* Layout Mode (Row vs Grid) */}
+          {/* Layout Mode (Row vs Stack) */}
           <div className="flex items-center rounded-md border border-zinc-800 bg-zinc-900/90 p-0.5 text-xs">
             <button type="button" onClick={() => setPreviewMode("live")} className={`rounded px-2 py-1 ${previewMode === "live" ? "bg-zinc-100 text-zinc-950" : "text-zinc-400"}`}>Live</button>
             <button type="button" onClick={() => setPreviewMode("preview")} className={`rounded px-2 py-1 ${previewMode === "preview" ? "bg-zinc-100 text-zinc-950" : "text-zinc-400"}`}>Snapshot</button>
@@ -834,15 +823,15 @@ export function ResponsiveStudio({
                 setLayoutMode("wrap");
                 saveSettings({ responsive: { layoutMode: "wrap" } });
               }}
-              title="Grid: wrap viewports into a responsive multi-row grid"
+              title="Stack: viewports in a vertical list"
               className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-all ${
                 layoutMode === "wrap"
                   ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
                   : "text-zinc-400 hover:text-zinc-200 font-medium"
               }`}
             >
-              <LayoutGrid className="h-3 w-3" />
-              <span>Grid</span>
+              <Rows3 className="h-3 w-3" />
+              <span>Stack</span>
             </button>
           </div>
 
@@ -930,12 +919,12 @@ export function ResponsiveStudio({
       {/* Main Studio Canvas */}
       <div
         ref={canvasRef}
-        className="studio-grid-bg relative flex-1 overflow-auto p-6 min-h-0"
+        className="studio-canvas-bg relative flex-1 overflow-auto p-6 min-h-0"
       >
         <div
           className={`flex gap-8 items-start pb-6 ${
             layoutMode === "wrap"
-              ? "flex-wrap justify-center"
+              ? "flex-col items-center"
               : "flex-row min-w-fit"
           }`}
         >

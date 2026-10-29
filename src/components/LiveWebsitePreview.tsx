@@ -115,7 +115,7 @@ export function LiveWebsitePreview({ url, width, height, zoom = 1, pageZoom = 10
         <span className="shrink-0 text-[10px]">{loading ? "Loading…" : connected ? "Live · ready to snap" : "Live"}</span>
         <button type="button" onClick={() => { setEntryUrl(currentUrl); setDirect((value) => !value); setLoading(true); }} className="shrink-0 rounded border border-zinc-700 px-2 py-1" title="Try direct loading if this website does not work in the interactive preview">{direct ? "Direct" : "Interactive"}</button>
       </div>
-      <div ref={containerRef} className="studio-grid-bg flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+      <div ref={containerRef} className="studio-canvas-bg flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
         <div className="relative shrink-0" style={{ width: width * scale * zoom, height: height * scale * zoom }}>
           <iframe
             key={`${entryUrl}-${direct}-${reload}`}

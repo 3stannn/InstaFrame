@@ -337,7 +337,7 @@ export const BACKDROP_OPTIONS = [
     name: "Transparent",
     section: "Minimal",
     swatchClass: "ring-zinc-600",
-    swatchStyle: { background: "repeating-conic-gradient(#71717a 0% 25%, #27272a 0% 50%) 50% / 6px 6px" },
+    swatchStyle: { background: "transparent" },
   },
   {
     id: "gradient-purple",

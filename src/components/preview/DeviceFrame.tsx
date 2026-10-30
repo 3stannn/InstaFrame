@@ -115,6 +115,7 @@ export function DeviceFrame({
   // Card unscaled total dimensions (including toolbar and borders)
   const unscaledWidth = device.width + BORDER_WIDTH * 2;
   const unscaledHeight = device.height + TOOLBAR_HEIGHT + BORDER_WIDTH * 2;
+  const compactToolbar = device.width < 560;
 
   // Scaled footprint allocated in the parent layout
   const scaledFootprintWidth = Math.round(unscaledWidth * scale);
@@ -168,9 +169,9 @@ export function DeviceFrame({
         }}
       >
         {/* Frame Toolbar */}
-        <div className="flex h-[36px] shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-900/90 px-2.5 select-none">
+        <div className="flex h-[36px] shrink-0 items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-900/90 px-2.5 select-none">
           {/* Left: Device Name, Dimensions Badge, Bridge Status */}
-          <div className="flex items-center gap-2 overflow-hidden">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
             {/* Loading / Active Status Dot */}
             <span
               className={`h-2 w-2 rounded-full flex-shrink-0 transition-colors ${
@@ -188,7 +189,7 @@ export function DeviceFrame({
             />
 
             {/* Viewport Name */}
-            <span className="truncate text-xs font-semibold text-zinc-200" title={device.name}>
+            <span className="min-w-0 truncate text-xs font-semibold text-zinc-200" title={device.name}>
               {device.name}
             </span>
 
@@ -197,22 +198,22 @@ export function DeviceFrame({
               type="button"
               onClick={() => setEditDimensionsOpen((prev) => !prev)}
               title="Click to edit custom dimensions"
-              className="flex items-center gap-1 rounded bg-zinc-800/90 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-zinc-300 hover:bg-zinc-700/80 transition-colors"
+              className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded bg-zinc-800/90 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-zinc-300 hover:bg-zinc-700/80 transition-colors"
             >
               <span>
                 {device.width} × {device.height}
               </span>
-              <Sliders className="h-2.5 w-2.5 opacity-60" />
+              {!compactToolbar && <Sliders className="h-2.5 w-2.5 opacity-60" />}
             </button>
 
             {/* Mode B: Cooperative Bridge Status Badge */}
             {previewMode === "live" && bridgeConnected && (
               <span
-                className="flex items-center gap-1 rounded bg-zinc-800 px-1.5 py-0.5 text-[9.5px] font-medium text-zinc-200 border border-zinc-700"
+                className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded bg-zinc-800 px-1.5 py-0.5 text-[9.5px] font-medium text-zinc-200 border border-zinc-700"
                 title={`Bridge Connected: Sync scroll ${bridgeCapabilities?.scroll ? "active" : "disabled"}`}
               >
-                <Wifi className="h-2.5 w-2.5 text-white animate-pulse" />
-                <span>Bridge Active</span>
+                <Wifi className="h-2.5 w-2.5 text-zinc-200 animate-pulse" />
+                <span className={compactToolbar ? "sr-only" : undefined}>Bridge Active</span>
               </span>
             )}
 
@@ -221,25 +222,26 @@ export function DeviceFrame({
               <button
                 type="button"
                 onClick={() => setManualProxy((prev) => (prev !== null ? !prev : !defaultInteractive))}
+                aria-label={`${isProxied ? "Interactive" : "Direct"} preview. Switch to ${isProxied ? "direct" : "interactive"} loading`}
                 title={
                   isProxied
                     ? "Interactive preview with page and scroll tracking. Click to try direct loading."
                     : "Direct website preview. Click to enable interactive page and scroll tracking."
                 }
-                className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[9.5px] font-medium transition-colors ${
+                className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-[9.5px] font-medium transition-colors ${
                   isProxied
                     ? "bg-zinc-800 text-zinc-100 border border-zinc-700 hover:bg-zinc-700"
                     : "text-zinc-400 hover:text-zinc-200 bg-zinc-800/80 hover:bg-zinc-800"
                 }`}
               >
                 <Shield className="h-2.5 w-2.5" />
-                <span>{isProxied ? "Interactive" : "Direct"}</span>
+                <span className={compactToolbar ? "sr-only" : undefined}>{isProxied ? "Interactive" : "Direct"}</span>
               </button>
             )}
           </div>
 
           {/* Right: Actions (Rotate, Reload, Capture, Open Original, Remove) */}
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             {/* Rotate / Orientation Swap */}
             <button
               type="button"

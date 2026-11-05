@@ -11,59 +11,66 @@ interface HeaderProps {
 
 export function Header({ currentTab, onTabChange }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-40 shrink-0 border-b border-zinc-800 bg-zinc-950">
-      <div className="editorial-label flex h-7 items-center justify-between bg-zinc-100 px-4 text-zinc-950">
-        <span>● INSTAFRAME LIVE · WEB STUDIO</span>
-        <span className="hidden sm:inline">RESPONSIVE CAPTURE · DEVICE MOCKUPS · PNG EXPORT</span>
-      </div>
-      <div className="flex min-h-14 items-center justify-between px-4">
-      <div className="flex w-full flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2.5 border-r border-zinc-800 pr-5">
-          <Image
-            src="/assets/icons/icon48.png"
-            alt="InstaFrame"
-            width={24}
-            height={24}
-            className="grayscale"
-          />
-          <div>
+    <header className="sticky top-0 z-40 shrink-0 border-b border-white/10 bg-black/95 backdrop-blur-md">
+      <div className="flex h-12 items-center justify-between px-3.5 sm:px-5">
+        {/* Brand & Editorial Meta */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <Image
+              src="/assets/icons/icon48.png"
+              alt="InstaFrame"
+              width={20}
+              height={20}
+              className="opacity-95 shrink-0"
+            />
             <div className="flex items-center gap-2">
-              <span className="text-base font-semibold tracking-[-0.025em] text-zinc-100">InstaFrame</span>
-              <span className="editorial-label border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-zinc-400">
-                Web
+              <span className="text-sm font-semibold tracking-[-0.015em] text-white">
+                InstaFrame
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] font-medium tracking-wider text-zinc-400">
+                2.6
               </span>
             </div>
           </div>
         </div>
 
-        {/* View Switcher Tabs (Uncarded, flat navigation) */}
-        <nav className="sm:ml-3 flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => onTabChange("responsive")}
-            className={`flex items-center gap-1.5 border px-3 py-2 text-xs font-medium transition-colors ${
-              currentTab === "responsive"
-                ? "border-zinc-100 bg-zinc-100 text-zinc-950 font-semibold"
-                : "border-transparent text-zinc-400 hover:border-zinc-800 hover:bg-zinc-900 hover:text-zinc-200"
-            }`}
-          >
-            <Monitor className="h-3.5 w-3.5" />
-            <span>Responsive Studio</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onTabChange("mockup")}
-            className={`flex items-center gap-1.5 border px-3 py-2 text-xs font-medium transition-colors ${
-              currentTab === "mockup"
-                ? "border-zinc-100 bg-zinc-100 text-zinc-950 font-semibold"
-                : "border-transparent text-zinc-400 hover:border-zinc-800 hover:bg-zinc-900 hover:text-zinc-200"
-            }`}
-          >
-            <Smartphone className="h-3.5 w-3.5" />
-            <span>Device Mockups</span>
-          </button>
+        {/* View Switcher Tabs (Floating Pill Segmented Controls) */}
+        <nav className="flex items-center">
+          <div className="inline-flex items-center rounded-full border border-white/10 bg-[#0a0a0c] p-1 text-xs shadow-inner">
+            <button
+              type="button"
+              onClick={() => onTabChange("responsive")}
+              className={`flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs transition-all duration-150 ease-out active:scale-[0.98] ${
+                currentTab === "responsive"
+                  ? "bg-white font-semibold text-black shadow-sm"
+                  : "font-medium text-zinc-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <Monitor className="h-3.5 w-3.5" />
+              <span>Responsive Studio</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onTabChange("mockup")}
+              className={`flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs transition-all duration-150 ease-out active:scale-[0.98] ${
+                currentTab === "mockup"
+                  ? "bg-white font-semibold text-black shadow-sm"
+                  : "font-medium text-zinc-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <Smartphone className="h-3.5 w-3.5" />
+              <span>Device Mockups</span>
+            </button>
+          </div>
         </nav>
-      </div>
+
+        {/* Right Status / Badge */}
+        <div className="hidden items-center gap-2 sm:flex">
+          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-[#0a0a0c] px-3 py-1 text-[11px] font-medium text-zinc-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.4)]" />
+            <span>Ready</span>
+          </div>
+        </div>
       </div>
     </header>
   );

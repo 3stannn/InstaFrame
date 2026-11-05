@@ -1,5 +1,12 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 export const metadata: Metadata = {
   title: "InstaFrame - Studio Mockup Suite & Responsive Viewports",
@@ -25,8 +32,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-zinc-950 text-zinc-100 selection:bg-zinc-100 selection:text-zinc-950">
+    <html lang="en" className={inter.variable}>
+      <body className={`${inter.className} min-h-screen bg-black text-white antialiased selection:bg-white selection:text-black`}>
         {children}
       </body>
     </html>

@@ -106,16 +106,38 @@ export function LiveWebsitePreview({ url, width, height, zoom = 1, pageZoom = 10
   }, [entryUrl, direct]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-zinc-950" data-testid="live-website-preview">
-      <div className="flex shrink-0 items-center gap-2 border-b border-zinc-800 px-3 py-2 text-xs text-zinc-400">
-        <button type="button" title="Go back in website" disabled={currentUrl === entryUrl} onClick={() => iframeRef.current?.contentWindow?.postMessage({ type: "INSTAFRAME_HISTORY_BACK" }, "*")} className="rounded p-1 hover:bg-zinc-800 disabled:opacity-30"><ArrowLeft className="h-3.5 w-3.5" /></button>
-        <button type="button" title="Reload live website" onClick={() => { setEntryUrl(currentUrl); setReload((value) => value + 1); setLoading(true); }} className="rounded p-1 hover:bg-zinc-800"><RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /></button>
-        <Globe className="h-3.5 w-3.5 shrink-0" />
-        <span className="min-w-0 flex-1 truncate" title={currentUrl}>{currentUrl}</span>
-        <span className="shrink-0 text-[10px]">{loading ? "Loading…" : connected ? "Live · ready to snap" : "Live"}</span>
-        <button type="button" onClick={() => { setEntryUrl(currentUrl); setDirect((value) => !value); setLoading(true); }} className="shrink-0 rounded border border-zinc-700 px-2 py-1" title="Try direct loading if this website does not work in the interactive preview">{direct ? "Direct" : "Interactive"}</button>
+    <div className="flex h-full min-h-0 flex-col bg-black" data-testid="live-website-preview">
+      <div className="flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#0a0a0c]/95 px-3.5 py-2 text-xs text-zinc-300">
+        <button
+          type="button"
+          title="Go back in website"
+          disabled={currentUrl === entryUrl}
+          onClick={() => iframeRef.current?.contentWindow?.postMessage({ type: "INSTAFRAME_HISTORY_BACK" }, "*")}
+          className="rounded-full p-1 text-zinc-400 hover:bg-white/10 hover:text-white active:scale-[0.98] transition-colors disabled:opacity-30"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          title="Reload live website"
+          onClick={() => { setEntryUrl(currentUrl); setReload((value) => value + 1); setLoading(true); }}
+          className="rounded-full p-1 text-zinc-400 hover:bg-white/10 hover:text-white active:scale-[0.98] transition-colors"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+        </button>
+        <Globe className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-zinc-200" title={currentUrl}>{currentUrl}</span>
+        <span className="shrink-0 text-[10px] text-zinc-400">{loading ? "Loading…" : connected ? "Live · ready to snap" : "Live"}</span>
+        <button
+          type="button"
+          onClick={() => { setEntryUrl(currentUrl); setDirect((value) => !value); setLoading(true); }}
+          className="shrink-0 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 px-3 py-1 text-white active:scale-[0.98] transition-all duration-150 font-medium"
+          title="Try direct loading if this website does not work in the interactive preview"
+        >
+          {direct ? "Direct" : "Interactive"}
+        </button>
       </div>
-      <div ref={containerRef} className="studio-canvas-bg flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+      <div ref={containerRef} className="studio-canvas-bg flex min-h-0 flex-1 items-center justify-center overflow-auto p-4 bg-black">
         <div className="relative shrink-0" style={{ width: width * scale * zoom, height: height * scale * zoom }}>
           <iframe
             key={`${entryUrl}-${direct}-${reload}`}
@@ -125,12 +147,14 @@ export function LiveWebsitePreview({ url, width, height, zoom = 1, pageZoom = 10
             src={direct ? entryUrl : `/api/proxy?url=${encodeURIComponent(entryUrl)}`}
             sandbox={direct ? "allow-scripts allow-forms allow-popups allow-same-origin" : "allow-scripts allow-forms allow-popups"}
             onLoad={handleLoad}
-            className="absolute left-0 top-0 origin-top-left rounded border border-zinc-700 bg-white"
+            className="absolute left-0 top-0 origin-top-left rounded-xl border border-white/10 bg-white shadow-2xl"
             style={{ width, height, transform: `scale(${scale * zoom})` }}
           />
         </div>
       </div>
-      <div className="shrink-0 border-t border-zinc-800 px-3 py-2 text-[11px] text-zinc-400">Scroll or follow links to choose your shot, then click Snap view.</div>
+      <div className="shrink-0 border-t border-white/10 bg-[#0a0a0c] px-3.5 py-2 text-[11px] text-zinc-400">
+        Scroll or follow links to choose your shot, then click Snap view.
+      </div>
     </div>
   );
 }

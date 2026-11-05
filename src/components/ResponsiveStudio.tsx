@@ -685,27 +685,27 @@ export function ResponsiveStudio({
   const viewerOrigin = typeof window !== "undefined" ? window.location.origin : "";
 
   return (
-    <div className="flex min-h-0 h-full flex-col bg-zinc-950 text-zinc-100">
+    <div className="flex min-h-0 h-full flex-col bg-black text-zinc-100">
       {/* Studio Toolbar Header */}
-      <div className="relative z-30 shrink-0 flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-950 px-3.5 py-2">
+      <div className="relative z-30 shrink-0 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#0a0a0c]/95 backdrop-blur-md px-4 py-2.5">
         {/* Left Side: URL Form */}
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
           {/* URL Input Form */}
           <form onSubmit={handleNavigate} className="flex items-center gap-2 flex-1 max-w-xl min-w-0">
             <div className="relative flex-1 min-w-0">
-              <Globe className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+              <Globe className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
               <input
                 type="text"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
                 placeholder="https://yourwebsite.com"
-                className="w-full rounded-md border border-zinc-800 bg-zinc-900/80 py-1.5 pl-8 pr-7 text-xs font-medium text-zinc-100 placeholder-zinc-500 transition-colors focus:border-zinc-700 focus:outline-none"
+                className="w-full rounded-full border border-white/10 bg-black py-1.5 pl-8 pr-8 text-xs font-normal text-white placeholder-zinc-500 transition-all duration-150 focus:border-white/30 focus:bg-[#0a0a0c] focus:outline-none focus:ring-1 focus:ring-white/20"
               />
               {urlInput && (
                 <button
                   type="button"
                   onClick={() => setUrlInput("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-zinc-500 hover:text-zinc-300"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-zinc-500 hover:text-white transition-colors duration-150"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -717,14 +717,14 @@ export function ResponsiveStudio({
               <button
                 type="button"
                 onClick={() => setAddMenuOpen((prev) => !prev)}
-                className="flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/80 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                className="flex items-center gap-1.5 rounded-full border border-white/10 bg-[#0a0a0c] px-3.5 py-1.5 text-xs font-medium text-zinc-300 hover:border-white/20 hover:bg-[#141417] hover:text-white active:scale-[0.98] transition-all duration-150"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>Add Viewport</span>
               </button>
 
               {addMenuOpen && (
-                <div className="absolute left-0 top-full z-50 mt-1 max-h-[380px] w-72 overflow-y-auto rounded-md border border-zinc-800 bg-zinc-950 p-1 shadow-lg">
+                <div className="absolute left-0 top-full z-50 mt-1.5 max-h-[380px] w-72 overflow-y-auto rounded-xl border border-white/10 bg-[#0a0a0c]/98 backdrop-blur-xl p-1.5 shadow-2xl">
                   {DEVICE_CATEGORIES.map((category, catIdx) => {
                     const items = Object.entries(DEVICE_PRESETS).filter(
                       ([_, preset]) => preset.category === category
@@ -733,9 +733,9 @@ export function ResponsiveStudio({
                     return (
                       <div
                         key={category}
-                        className={catIdx > 0 ? "mt-1 border-t border-zinc-800/80 pt-1" : ""}
+                        className={catIdx > 0 ? "mt-1 border-t border-white/5 pt-1.5" : ""}
                       >
-                        <div className="px-2 py-1 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-zinc-500">
+                        <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
                           {category}
                         </div>
                         <div className="space-y-0.5">
@@ -754,15 +754,15 @@ export function ResponsiveStudio({
                                 key={key}
                                 type="button"
                                 onClick={() => handleAddDevice(key)}
-                                className="flex w-full items-center justify-between rounded px-2 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+                                className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 transition-colors duration-120 hover:bg-[#141417] hover:text-white active:scale-[0.98]"
                               >
                                 <div className="flex items-center gap-2 overflow-hidden">
-                                  <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-zinc-800/80 text-zinc-400">
+                                  <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-white/5 border border-white/5 text-zinc-400">
                                     <IconComp className="h-3 w-3" />
                                   </span>
                                   <span className="truncate">{preset.name}</span>
                                 </div>
-                                <span className="ml-2 flex-shrink-0 rounded bg-zinc-800/80 px-1.5 py-0.5 font-mono text-[9.5px] tabular-nums text-zinc-400">
+                                <span className="ml-2 flex-shrink-0 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[9.5px] tabular-nums text-zinc-400">
                                   {preset.width} × {preset.height}
                                 </span>
                               </button>
@@ -778,7 +778,7 @@ export function ResponsiveStudio({
 
             <button
               type="submit"
-              className="flex items-center rounded-md bg-zinc-100 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200 active:scale-95 shadow-sm shrink-0"
+              className="flex items-center rounded-full bg-white px-4 py-1.5 text-xs font-semibold text-black transition-all duration-150 hover:bg-zinc-200 active:scale-[0.98] shadow-sm shrink-0"
             >
               <span>Go</span>
             </button>
@@ -786,21 +786,43 @@ export function ResponsiveStudio({
               type="button"
               onClick={handleReloadAll}
               title="Reload all viewports"
-              className="flex items-center justify-center rounded-md border border-zinc-800 bg-zinc-900/80 p-2 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white shrink-0"
+              className="flex items-center justify-center rounded-full border border-white/10 bg-[#0a0a0c] p-2 text-zinc-400 transition-all duration-150 hover:border-white/20 hover:bg-[#141417] hover:text-white active:scale-[0.98] shrink-0"
             >
               <RefreshCw className="h-3.5 w-3.5" />
             </button>
           </form>
         </div>
 
-        {/* Right Side Controls: Layout Mode Toggle + Sync Scroll + Zoom Segmented Control */}
+        {/* Right Side Controls: Mode + Layout + Sync Scroll + Zoom (Segmented Pill Controls) */}
         <div className="flex items-center gap-3 shrink-0">
-          {/* Layout Mode (Row vs Stack) */}
-          <div className="flex items-center rounded-md border border-zinc-800 bg-zinc-900/90 p-0.5 text-xs">
-            <button type="button" onClick={() => setPreviewMode("live")} className={`rounded px-2 py-1 ${previewMode === "live" ? "bg-zinc-100 text-zinc-950" : "text-zinc-400"}`}>Live</button>
-            <button type="button" onClick={() => setPreviewMode("preview")} className={`rounded px-2 py-1 ${previewMode === "preview" ? "bg-zinc-100 text-zinc-950" : "text-zinc-400"}`}>Snapshot</button>
+          {/* Preview Mode (Live vs Snapshot) */}
+          <div className="inline-flex items-center rounded-full border border-white/10 bg-[#0a0a0c] p-1 text-xs gap-1 shadow-inner">
+            <button
+              type="button"
+              onClick={() => setPreviewMode("live")}
+              className={`rounded-full px-3 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
+                previewMode === "live"
+                  ? "bg-white font-semibold text-black shadow-sm"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              Live
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewMode("preview")}
+              className={`rounded-full px-3 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
+                previewMode === "preview"
+                  ? "bg-white font-semibold text-black shadow-sm"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              Snapshot
+            </button>
           </div>
-          <div className="flex items-center rounded-md border border-zinc-800 bg-zinc-900/90 p-0.5 text-xs">
+
+          {/* Layout Mode (Row vs Stack) */}
+          <div className="inline-flex items-center rounded-full border border-white/10 bg-[#0a0a0c] p-1 text-xs gap-1 shadow-inner">
             <button
               type="button"
               onClick={() => {
@@ -808,10 +830,10 @@ export function ResponsiveStudio({
                 saveSettings({ responsive: { layoutMode: "row" } });
               }}
               title="Row: viewports in a single horizontal row"
-              className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-all ${
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
                 layoutMode === "row"
-                  ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
-                  : "text-zinc-400 hover:text-zinc-200 font-medium"
+                  ? "bg-white font-semibold text-black shadow-sm"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
               }`}
             >
               <Columns className="h-3 w-3" />
@@ -824,10 +846,10 @@ export function ResponsiveStudio({
                 saveSettings({ responsive: { layoutMode: "wrap" } });
               }}
               title="Stack: viewports in a vertical list"
-              className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-all ${
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
                 layoutMode === "wrap"
-                  ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
-                  : "text-zinc-400 hover:text-zinc-200 font-medium"
+                  ? "bg-white font-semibold text-black shadow-sm"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
               }`}
             >
               <Rows3 className="h-3 w-3" />
@@ -842,26 +864,26 @@ export function ResponsiveStudio({
               role="switch"
               aria-checked={syncScroll}
               onClick={() => setSyncScroll(!syncScroll)}
-              className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-150 ease-in-out focus:outline-none ${
+              className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-150 ease-out focus:outline-none ${
                 syncScroll
-                  ? "border-zinc-100 bg-zinc-100"
-                  : "border-zinc-700 bg-zinc-800 hover:border-zinc-600"
+                  ? "border-white/30 bg-white"
+                  : "border-white/15 bg-white/10 hover:border-white/25"
               }`}
             >
               <span
                 aria-hidden="true"
-                className={`pointer-events-none inline-block h-2.5 w-2.5 rounded-full transition-transform duration-150 ease-in-out ${
+                className={`pointer-events-none inline-block h-2.5 w-2.5 rounded-full transition-transform duration-150 ease-out ${
                   syncScroll
-                    ? "translate-x-3.5 bg-zinc-950"
-                    : "translate-x-0.5 bg-zinc-300"
+                    ? "translate-x-3.5 bg-black"
+                    : "translate-x-0.5 bg-zinc-400"
                 }`}
               />
             </button>
             <span className="text-xs text-zinc-300 font-medium">Sync Scroll</span>
           </div>
 
-          {/* Scale Buttons (Segmented Control) */}
-          <div className="flex items-center rounded-md border border-zinc-800 bg-zinc-900/90 p-0.5 text-xs">
+          {/* Scale Buttons (Segmented Control - Exact Match with User Inspo) */}
+          <div className="inline-flex items-center rounded-full border border-white/10 bg-[#0a0a0c] p-1 text-xs gap-1 shadow-inner">
             <button
               type="button"
               onClick={() => {
@@ -871,10 +893,10 @@ export function ResponsiveStudio({
                   canvasRef.current.scrollLeft = 0;
                 }
               }}
-              className={`rounded px-2.5 py-1 text-xs transition-all ${
+              className={`rounded-full px-3 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
                 currentScale === "auto"
-                  ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
-                  : "text-zinc-400 hover:text-zinc-200 font-medium"
+                  ? "bg-white font-semibold text-black shadow-sm"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
               }`}
             >
               Fit
@@ -882,10 +904,10 @@ export function ResponsiveStudio({
             <button
               type="button"
               onClick={() => setCurrentScale(1)}
-              className={`rounded px-2.5 py-1 text-xs transition-all ${
+              className={`rounded-full px-3 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
                 currentScale === 1
-                  ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
-                  : "text-zinc-400 hover:text-zinc-200 font-medium"
+                  ? "bg-white font-semibold text-black shadow-sm"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
               }`}
             >
               100%
@@ -893,10 +915,10 @@ export function ResponsiveStudio({
             <button
               type="button"
               onClick={() => setCurrentScale(0.75)}
-              className={`rounded px-2.5 py-1 text-xs transition-all ${
+              className={`rounded-full px-3 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
                 currentScale === 0.75
-                  ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
-                  : "text-zinc-400 hover:text-zinc-200 font-medium"
+                  ? "bg-white font-semibold text-black shadow-sm"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
               }`}
             >
               75%
@@ -904,10 +926,10 @@ export function ResponsiveStudio({
             <button
               type="button"
               onClick={() => setCurrentScale(0.5)}
-              className={`rounded px-2.5 py-1 text-xs transition-all ${
+              className={`rounded-full px-3 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
                 currentScale === 0.5
-                  ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
-                  : "text-zinc-400 hover:text-zinc-200 font-medium"
+                  ? "bg-white font-semibold text-black shadow-sm"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
               }`}
             >
               50%
@@ -915,11 +937,10 @@ export function ResponsiveStudio({
           </div>
         </div>
       </div>
-
       {/* Main Studio Canvas */}
       <div
         ref={canvasRef}
-        className="studio-canvas-bg relative flex-1 overflow-auto p-6 min-h-0"
+        className="studio-canvas-bg relative flex-1 overflow-auto p-6 min-h-0 bg-black"
       >
         <div
           className={`flex gap-8 items-start pb-6 ${

@@ -11,19 +11,20 @@ const config: Config = {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
-        zinc: {
-          50: "#050505",
-          100: "#0a0a0a",
-          200: "#161616",
-          300: "#2f2f2f",
-          400: "#525252",
-          500: "#6b6b6b",
-          600: "#8a8a8a",
-          700: "#c9c9c9",
-          800: "#e6e6e6",
-          900: "#f4f4f4",
-          950: "#ffffff",
+        canvas: "#000000",
+        surface: {
+          DEFAULT: "#0a0a0c",
+          elevated: "#0a0a0c",
+          hover: "#141417",
+          active: "#1c1c22",
         },
+      },
+      letterSpacing: {
+        tight: "-0.015em",
+        tighter: "-0.03em",
+      },
+      borderRadius: {
+        device: "12px",
       },
     },
   },

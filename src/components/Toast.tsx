@@ -42,28 +42,22 @@ function ToastItem({
   }, [toast.id, toast.duration, toast.message, toast.type, onDismiss]);
 
   const icons = {
-    success: <CheckCircle2 className="h-4 w-4 text-white" />,
-    error: <AlertCircle className="h-4 w-4 text-white" />,
-    info: <Info className="h-4 w-4 text-zinc-300" />,
-  };
-
-  const borders = {
-    success: "border-zinc-700 bg-zinc-900/95 text-zinc-100",
-    error: "border-zinc-600 bg-zinc-900/95 text-zinc-100",
-    info: "border-zinc-800 bg-zinc-900/95 text-zinc-100",
+    success: <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />,
+    error: <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />,
+    info: <Info className="h-4 w-4 text-zinc-300 shrink-0" />,
   };
 
   return (
     <div
-      className={`pointer-events-auto flex items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-xs shadow-lg shadow-black/40 backdrop-blur-md transition-all duration-150 animate-in fade-in slide-in-from-bottom-2 ${borders[toast.type]}`}
+      className="pointer-events-auto flex items-center gap-2.5 rounded-xl border border-white/10 bg-[#0a0a0c]/98 px-3.5 py-2.5 text-xs text-white shadow-2xl shadow-black/80 backdrop-blur-xl transition-all duration-150 animate-in fade-in slide-in-from-bottom-2"
     >
       {icons[toast.type]}
-      <span className="font-medium">{toast.message}</span>
+      <span className="font-medium tracking-tight">{toast.message}</span>
       <button
         type="button"
         aria-label="Dismiss notification"
         onClick={() => onDismiss(toast.id)}
-        className="ml-2 text-zinc-500 hover:text-zinc-300"
+        className="ml-2 rounded-full p-1 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
       >
         <X className="h-3.5 w-3.5" />
       </button>

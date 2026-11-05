@@ -100,66 +100,70 @@ export function CustomDropdown({
     if (swatchClass || swatchStyle) {
       return (
         <span
+          className={`h-3 w-3 shrink-0 rounded-full border border-white/20 ${swatchClass || ""}`}
           style={swatchStyle}
-          className={`h-4 w-4 flex-shrink-0 rounded-full ring-1 ring-white/10 shadow-sm ${swatchClass || ""}`}
         />
       );
     }
-    let IconComponent = null;
-    if (icon === "monitor") IconComponent = Monitor;
-    else if (icon === "laptop") IconComponent = Laptop;
-    else if (icon === "tablet") IconComponent = Tablet;
-    else if (icon === "phone") IconComponent = Smartphone;
-    else if (icon === "custom") IconComponent = Sliders;
-    else if (icon === "raw") IconComponent = Square;
-    else if (icon === "pro") IconComponent = Sparkles;
 
-    if (!IconComponent) return null;
+    const iconClasses = `h-3.5 w-3.5 flex-shrink-0 ${
+      isSelected ? "text-white" : "text-zinc-400"
+    }`;
 
-    return (
-      <span
-        className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded transition-colors ${
-          isSelected
-            ? "bg-zinc-200 text-zinc-900"
-            : "bg-zinc-800/80 text-zinc-400"
-        }`}
-      >
-        <IconComponent className="h-3 w-3" />
-      </span>
-    );
+    switch (icon) {
+      case "monitor":
+        return <Monitor className={iconClasses} />;
+      case "laptop":
+        return <Laptop className={iconClasses} />;
+      case "tablet":
+        return <Tablet className={iconClasses} />;
+      case "phone":
+        return <Smartphone className={iconClasses} />;
+      case "custom":
+        return <Sliders className={iconClasses} />;
+      case "raw":
+        return <Square className={iconClasses} />;
+      case "pro":
+        return <Sparkles className={iconClasses} />;
+      default:
+        return null;
+    }
   };
 
   return (
-    <div ref={containerRef} className={`relative w-full ${className}`}>
-      {/* Dropdown Trigger Button */}
+    <div className={`relative ${className}`} ref={containerRef}>
+      {/* Trigger Button */}
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className={`flex h-8 w-full items-center justify-between rounded-md border px-2.5 text-xs outline-none transition-all duration-150 ${
-          isOpen
-            ? "border-zinc-600 bg-zinc-900"
-            : "border-zinc-800 bg-zinc-900/90 hover:border-zinc-700 hover:bg-zinc-900"
-        } ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+        className={`flex h-9 w-full items-center justify-between rounded-full border border-white/10 bg-[#0a0a0c] px-3.5 text-left text-xs text-white transition-all duration-150 ease-out hover:border-white/20 hover:bg-[#141417] active:scale-[0.98] focus:outline-none focus:ring-1 focus:ring-white/20 disabled:cursor-not-allowed disabled:opacity-50 ${
+          isOpen ? "border-white/25 ring-1 ring-white/20 bg-[#141417]" : ""
+        }`}
       >
         <div className="flex min-w-0 items-center gap-2 overflow-hidden">
-          {renderIcon(selectedItem?.icon, selectedItem?.swatchClass, selectedItem?.swatchStyle, false)}
-          <span className="truncate font-semibold text-zinc-100">
+          {renderIcon(
+            selectedItem?.icon,
+            selectedItem?.swatchClass,
+            selectedItem?.swatchStyle,
+            true
+          )}
+          <span className="truncate font-medium text-white">
             {selectedItem ? selectedItem.label : placeholder}
           </span>
         </div>
 
         <div className="ml-2 flex flex-shrink-0 items-center gap-1.5">
           {showTriggerMeta && selectedItem?.meta && (
-            <span className="rounded border border-zinc-700/40 bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-zinc-400">
+            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[10px] tabular-nums text-zinc-400">
               {selectedItem.meta}
             </span>
           )}
           <ChevronDown
-            className={`h-3.5 w-3.5 text-zinc-400 transition-transform duration-150 ${
-              isOpen ? "rotate-180 text-zinc-200" : ""
+            className={`h-3.5 w-3.5 text-zinc-400 transition-transform duration-150 ease-out ${
+              isOpen ? "rotate-180 text-white" : ""
             }`}
           />
         </div>
@@ -169,11 +173,11 @@ export function CustomDropdown({
       {isOpen && (
         <div
           role="listbox"
-          className={`absolute top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-md border border-zinc-800 bg-zinc-950 p-1 shadow-lg ${
+          className={`absolute top-full z-50 mt-1.5 max-h-72 overflow-y-auto rounded-xl border border-white/10 bg-[#0a0a0c]/98 backdrop-blur-xl p-1.5 shadow-2xl ${
             align === "right"
-              ? "right-0 w-full min-w-[210px]"
+              ? "right-0 w-full min-w-[220px]"
               : align === "left"
-              ? "left-0 w-full min-w-[210px]"
+              ? "left-0 w-full min-w-[220px]"
               : "left-0 right-0 w-full"
           }`}
         >
@@ -181,8 +185,8 @@ export function CustomDropdown({
             <div key={group.sectionName || `group-${groupIdx}`}>
               {group.sectionName && (
                 <div
-                  className={`px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 ${
-                    groupIdx > 0 ? "mt-1 border-t border-zinc-800/80 pt-1.5" : ""
+                  className={`px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 ${
+                    groupIdx > 0 ? "mt-1 border-t border-white/5 pt-1.5" : ""
                   }`}
                 >
                   {group.sectionName}
@@ -203,13 +207,13 @@ export function CustomDropdown({
                         onChange(item.value);
                         setIsOpen(false);
                       }}
-                      className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-all duration-100 ${
+                      className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs transition-colors duration-120 active:scale-[0.98] ${
                         isSelected
-                          ? "bg-zinc-100 font-semibold text-zinc-950 shadow-sm"
-                          : "text-zinc-300 hover:bg-zinc-800/80 hover:text-zinc-100"
+                          ? "bg-white/10 font-semibold text-white border border-white/15"
+                          : "text-zinc-300 hover:bg-[#141417] hover:text-white border border-transparent"
                       }`}
                     >
-                      <div className="flex min-w-0 items-center gap-2 overflow-hidden">
+                      <div className="flex min-w-0 items-center gap-2.5 overflow-hidden">
                         {renderIcon(item.icon, item.swatchClass, item.swatchStyle, isSelected)}
                         <span className="truncate">{item.label}</span>
                       </div>
@@ -217,17 +221,17 @@ export function CustomDropdown({
                       <div className="ml-2 flex flex-shrink-0 items-center gap-1.5">
                         {item.meta && (
                           <span
-                            className={`rounded px-1.5 py-0.5 font-mono text-[9.5px] tabular-nums ${
+                            className={`rounded-full px-2 py-0.5 font-mono text-[9.5px] tabular-nums border ${
                               isSelected
-                                ? "bg-zinc-200 text-zinc-800"
-                                : "bg-zinc-800/80 text-zinc-400"
+                                ? "border-white/20 bg-white/10 text-white"
+                                : "border-white/10 bg-white/5 text-zinc-400"
                             }`}
                           >
                             {item.meta}
                           </span>
                         )}
                         {isSelected && (
-                          <Check className="h-3.5 w-3.5 flex-shrink-0 text-zinc-900 stroke-[2.5]" />
+                          <Check className="h-3.5 w-3.5 flex-shrink-0 text-white stroke-[2.5]" />
                         )}
                       </div>
                     </button>

@@ -114,7 +114,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
     if (saved.fitMode) setFitMode(saved.fitMode);
   }, []);
 
-  // Memoized dropdown item configs (zero duplicates, matched to extension aesthetic)
+  // Memoized dropdown item configs (zero duplicates, matched to design system)
   const viewportItems: DropdownItem[] = useMemo(() => {
     const items: DropdownItem[] = [];
     DEVICE_CATEGORIES.forEach((cat) => {
@@ -374,7 +374,6 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
   }, [isActive, initialConfig]);
 
   // Re-run composite whenever options, frame, backdrop, or screenshot changes
-  // Note: Decoupled from urlInput keystrokes to ensure smooth typing with zero lag
   const runComposite = useCallback(async (isCurrent: () => boolean) => {
     if (!screenshotDataUrl) return;
     setIsCompositing(true);
@@ -685,9 +684,9 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col lg:flex-row overflow-auto lg:overflow-hidden bg-zinc-950">
-      {/* Settings & Controls Sidebar */}
-      <div className="w-full lg:w-80 flex-shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-800 bg-zinc-950 p-3.5 overflow-y-auto space-y-3.5">
+    <div className="flex min-h-0 flex-1 flex-col lg:flex-row overflow-auto lg:overflow-hidden bg-black">
+      {/* Settings & Controls Sidebar (Zero nested card enclosures) */}
+      <div className="w-full lg:w-80 flex-shrink-0 border-b lg:border-b-0 lg:border-r border-white/10 bg-[#0a0a0c] p-4 overflow-y-auto space-y-4">
         {/* Source URL & Capture */}
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
@@ -698,19 +697,19 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
 
           <form aria-label="Open live website" onSubmit={handleOpenLive} className="space-y-2">
             <div className="relative flex items-center">
-              <Globe className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-zinc-500" />
+              <Globe className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-zinc-500" />
               <input
                 type="text"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
                 placeholder="https://yourwebsite.com"
-                className="w-full rounded-md border border-zinc-800 bg-zinc-900/90 py-1.5 pl-8 pr-7 text-xs text-zinc-100 placeholder-zinc-500 outline-none transition-colors focus:border-zinc-700"
+                className="w-full rounded-full border border-white/10 bg-black py-1.5 pl-8 pr-8 text-xs text-white placeholder-zinc-500 outline-none transition-all duration-150 focus:border-white/30 focus:bg-[#0a0a0c] focus:ring-1 focus:ring-white/20"
               />
               {urlInput && (
                 <button
                   type="button"
                   onClick={() => setUrlInput("")}
-                  className="absolute right-2 text-zinc-500 hover:text-zinc-300"
+                  className="absolute right-2.5 rounded-full p-0.5 text-zinc-500 hover:text-white transition-colors duration-150"
                   title="Clear input"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -721,23 +720,30 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
             <button
               type="submit"
               disabled={isCapturing}
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200 active:scale-[0.99] disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-white px-3.5 py-2 text-xs font-semibold text-black transition-all duration-150 hover:bg-zinc-200 active:scale-[0.98] shadow-sm disabled:opacity-50"
             >
               {isCapturing ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-900" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-black" />
                   <span>Emulating Viewport...</span>
                 </>
               ) : (
                 <>
-                  <Camera className="h-3.5 w-3.5 text-zinc-900" />
+                  <Camera className="h-3.5 w-3.5 text-black" />
                   <span>Open website</span>
                 </>
               )}
             </button>
           </form>
-          <button type="button" onClick={handleSnapLive} disabled={!liveUrl || !liveReady || isCapturing} className="flex w-full items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-800 py-2 text-xs font-semibold text-white hover:bg-zinc-700 disabled:opacity-40">
-            <Camera className="h-3.5 w-3.5" />{isCapturing ? "Snapping…" : "Snap view"}
+
+          <button
+            type="button"
+            onClick={handleSnapLive}
+            disabled={!liveUrl || !liveReady || isCapturing}
+            className="flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 py-2 text-xs font-semibold text-white hover:bg-white/10 hover:border-white/20 active:scale-[0.98] disabled:opacity-40 transition-all duration-150"
+          >
+            <Camera className="h-3.5 w-3.5" />
+            <span>{isCapturing ? "Snapping…" : "Snap view"}</span>
           </button>
 
           {/* Alternative Ingestion Buttons */}
@@ -745,7 +751,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
             <button
               type="button"
               onClick={handleCaptureScreen}
-              className="flex-1 rounded-md border border-zinc-800 bg-zinc-900/60 py-1 text-[11px] font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors text-center"
+              className="flex-1 rounded-full border border-white/10 bg-white/5 py-1.5 text-[11px] font-medium text-zinc-300 hover:bg-white/10 hover:border-white/20 hover:text-white active:scale-[0.98] transition-all duration-150 text-center"
             >
               Capture Screen
             </button>
@@ -753,7 +759,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex-1 rounded-md border border-zinc-800 bg-zinc-900/60 py-1 text-[11px] font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors text-center"
+              className="flex-1 rounded-full border border-white/10 bg-white/5 py-1.5 text-[11px] font-medium text-zinc-300 hover:bg-white/10 hover:border-white/20 hover:text-white active:scale-[0.98] transition-all duration-150 text-center"
             >
               Upload Image
             </button>
@@ -767,7 +773,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
           </div>
         </div>
 
-        <div className="h-px bg-zinc-800" />
+        <div className="h-px bg-white/10" />
 
         {/* Viewport Preset */}
         <div className="space-y-2.5">
@@ -786,26 +792,26 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
           {/* Custom Size Fields */}
           {selectedPreset === "custom" && (
             <div className="flex items-center gap-2">
-              <div className="flex flex-1 items-center rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs">
-                <span className="mr-1.5 text-zinc-500">W</span>
+              <div className="flex flex-1 items-center rounded-full border border-white/10 bg-black px-3 py-1.5 text-xs">
+                <span className="mr-1.5 font-medium text-zinc-500">W</span>
                 <input
                   type="number"
                   value={customW}
                   onChange={(e) => setCustomW(parseInt(e.target.value, 10) || 1440)}
-                  className="w-full bg-transparent text-zinc-100 outline-none tabular-nums"
+                  className="w-full bg-transparent text-white outline-none tabular-nums"
                 />
-                <span className="text-[10px] text-zinc-500">PX</span>
+                <span className="text-[10px] font-mono text-zinc-500">PX</span>
               </div>
               <span className="text-zinc-600">×</span>
-              <div className="flex flex-1 items-center rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs">
-                <span className="mr-1.5 text-zinc-500">H</span>
+              <div className="flex flex-1 items-center rounded-full border border-white/10 bg-black px-3 py-1.5 text-xs">
+                <span className="mr-1.5 font-medium text-zinc-500">H</span>
                 <input
                   type="number"
                   value={customH}
                   onChange={(e) => setCustomH(parseInt(e.target.value, 10) || 900)}
-                  className="w-full bg-transparent text-zinc-100 outline-none tabular-nums"
+                  className="w-full bg-transparent text-white outline-none tabular-nums"
                 />
-                <span className="text-[10px] text-zinc-500">PX</span>
+                <span className="text-[10px] font-mono text-zinc-500">PX</span>
               </div>
             </div>
           )}
@@ -822,25 +828,25 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
                 setFullPage(next);
                 saveSettings({ fullPage: next });
               }}
-              className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-150 ease-in-out focus:outline-none ${
+              className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-150 ease-out focus:outline-none ${
                 fullPage
-                  ? "border-zinc-100 bg-zinc-100"
-                  : "border-zinc-700 bg-zinc-800 hover:border-zinc-600"
+                  ? "border-white/30 bg-white"
+                  : "border-white/15 bg-white/10 hover:border-white/25"
               }`}
             >
               <span
                 aria-hidden="true"
-                className={`pointer-events-none inline-block h-2.5 w-2.5 rounded-full transition-transform duration-150 ease-in-out ${
+                className={`pointer-events-none inline-block h-2.5 w-2.5 rounded-full transition-transform duration-150 ease-out ${
                   fullPage
-                    ? "translate-x-3.5 bg-zinc-950"
-                    : "translate-x-0.5 bg-zinc-300"
+                    ? "translate-x-3.5 bg-black"
+                    : "translate-x-0.5 bg-zinc-400"
                 }`}
               />
             </button>
           </div>
         </div>
 
-        <div className="h-px bg-zinc-800" />
+        <div className="h-px bg-white/10" />
 
         {/* Frame & Presentation */}
         <div className="space-y-2.5">
@@ -853,7 +859,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
           <div className="flex flex-col gap-3">
             {/* Frame Select */}
             <div>
-              <label className="block text-[10px] font-medium text-zinc-500 mb-1">Hardware Frame</label>
+              <label className="block text-[10px] font-medium text-zinc-400 mb-1">Hardware Frame</label>
               <CustomDropdown
                 value={selectedFrame}
                 onChange={handleFrameSelect}
@@ -865,7 +871,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
 
             {/* Backdrop Select */}
             <div>
-              <label className="block text-[10px] font-medium text-zinc-500 mb-1">Backdrop Style</label>
+              <label className="block text-[10px] font-medium text-zinc-400 mb-1">Backdrop Style</label>
               <CustomDropdown
                 value={selectedBackdrop}
                 onChange={handleBackdropChange}
@@ -876,20 +882,20 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
             </div>
           </div>
 
-          {/* Canvas Fit Mode */}
+          {/* Canvas Screen Fitting (Sleek Segmented Pill, Zero Nested Box) */}
           <div>
             <label className="block text-[10px] font-medium text-zinc-400 mb-1">Canvas Screen Fitting</label>
-            <div className="flex flex-col gap-1 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
+            <div className="inline-flex w-full rounded-full border border-white/10 bg-[#0a0a0c] p-1 text-xs gap-1 shadow-inner">
               <button
                 type="button"
                 onClick={() => {
                   setFitMode("smart");
                   saveSettings({ fitMode: "smart" });
                 }}
-                className={`rounded py-1 text-center text-xs font-medium transition-colors ${
+                className={`flex-1 rounded-full py-1 text-center text-xs transition-all duration-150 active:scale-[0.98] ${
                   fitMode === "smart" || fitMode === "cover"
-                    ? "bg-zinc-100 text-zinc-950 shadow-sm font-semibold"
-                    : "text-zinc-400 hover:text-zinc-200"
+                    ? "bg-white font-semibold text-black shadow-sm"
+                    : "text-zinc-400 hover:text-white"
                 }`}
               >
                 Responsive Fill
@@ -900,10 +906,10 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
                   setFitMode("contain");
                   saveSettings({ fitMode: "contain" });
                 }}
-                className={`rounded py-1 text-center text-xs font-medium transition-colors ${
+                className={`flex-1 rounded-full py-1 text-center text-xs transition-all duration-150 active:scale-[0.98] ${
                   fitMode === "contain"
-                    ? "bg-zinc-100 text-zinc-950 shadow-sm font-semibold"
-                    : "text-zinc-400 hover:text-zinc-200"
+                    ? "bg-white font-semibold text-black shadow-sm"
+                    : "text-zinc-400 hover:text-white"
                 }`}
               >
                 Fit Whole Page
@@ -913,7 +919,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
 
           {/* Page Zoom Select */}
           <div>
-            <label className="block text-[10px] font-medium text-zinc-500 mb-1">Page Zoom Level</label>
+            <label className="block text-[10px] font-medium text-zinc-400 mb-1">Page Zoom Level</label>
             <CustomDropdown
               value={selectedZoom}
               onChange={handleZoomChange}
@@ -923,7 +929,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
 
           {/* iPhone Notch settings */}
           {selectedFrame.toLowerCase().includes("iphone") && (
-            <div className="flex items-center justify-between border-t border-zinc-800 pt-2.5">
+            <div className="flex items-center justify-between border-t border-white/10 pt-2.5">
               <span className="text-[10px] font-medium text-zinc-400">Header Theme</span>
               <div className="flex items-center gap-3">
                 <input
@@ -934,7 +940,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
                     setAutoNotch(false);
                     saveSettings({ notchColor: e.target.value, autoNotch: false });
                   }}
-                  className="h-5 w-7 cursor-pointer rounded border border-zinc-800 bg-transparent"
+                  className="h-5 w-7 cursor-pointer rounded border border-white/10 bg-transparent"
                   title="Pick Header Color"
                 />
                 <label className="flex cursor-pointer items-center gap-1.5 text-xs text-zinc-400">
@@ -945,7 +951,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
                       setAutoNotch(e.target.checked);
                       saveSettings({ autoNotch: e.target.checked });
                     }}
-                    className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-800 accent-white text-white focus:ring-0"
+                    className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-white text-white focus:ring-0"
                   />
                   <span>Auto</span>
                 </label>
@@ -958,15 +964,39 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
       {/* Canvas Mockup Preview Surface */}
       <div className="flex min-h-[420px] lg:min-h-0 flex-1 flex-col overflow-hidden">
         {/* Preview Topbar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-950 px-4 py-2">
-          <div className="flex items-center gap-1 rounded-md border border-zinc-800 p-0.5 text-xs">
-            <button type="button" onClick={() => setPreviewStage("live")} disabled={!liveUrl} className={`rounded px-2 py-1 disabled:opacity-40 ${previewStage === "live" ? "bg-zinc-100 text-zinc-950" : "text-zinc-400"}`}>Live website</button>
-            <button type="button" onClick={() => setPreviewStage("mockup")} className={`rounded px-2 py-1 ${previewStage === "mockup" ? "bg-zinc-100 text-zinc-950" : "text-zinc-400"}`}>Mockup</button>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-[#0a0a0c] px-4 py-2.5">
+          <div className="inline-flex items-center rounded-full border border-white/10 bg-[#0a0a0c] p-1 text-xs gap-1 shadow-inner">
+            <button
+              type="button"
+              onClick={() => setPreviewStage("live")}
+              disabled={!liveUrl}
+              className={`rounded-full px-3 py-1 transition-all duration-150 active:scale-[0.98] disabled:opacity-40 ${
+                previewStage === "live"
+                  ? "bg-white font-semibold text-black shadow-sm"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              Live website
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewStage("mockup")}
+              className={`rounded-full px-3 py-1 transition-all duration-150 active:scale-[0.98] ${
+                previewStage === "mockup"
+                  ? "bg-white font-semibold text-black shadow-sm"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              Mockup
+            </button>
           </div>
+
           <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold text-zinc-300">{previewStage === "live" ? "Live preview" : "Mockup preview"}</span>
+            <span className="text-xs font-semibold tracking-[-0.015em] text-white">
+              {previewStage === "live" ? "Live preview" : "Mockup preview"}
+            </span>
             {compositeDims && (
-              <span className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[10.5px] font-mono tabular-nums text-zinc-400">
+              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-mono tabular-nums text-zinc-300">
                 {compositeDims}
               </span>
             )}
@@ -974,7 +1004,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
               <button
                 type="button"
                 onClick={() => handleCaptureUrl(undefined, urlInput, selectedPreset, selectedFrame)}
-                className="flex items-center gap-1 rounded border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[10px] font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-medium text-zinc-300 hover:bg-white/10 hover:border-white/20 hover:text-white active:scale-[0.98] transition-all duration-150"
               >
                 <RefreshCw className="h-2.5 w-2.5" />
                 <span>Re-render responsive for {DEVICE_PRESETS[selectedPreset]?.name || selectedPreset}</span>
@@ -982,14 +1012,14 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
             )}
           </div>
 
-          {/* Center: Canvas Zoom & Pan Controls */}
-          <div className="flex items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
+          {/* Center: Canvas Zoom & Pan Controls (Floating Segmented Control) */}
+          <div className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-[#0a0a0c] p-1 text-xs shadow-inner">
             <button
               type="button"
               onClick={handleZoomOut}
               disabled={canvasZoom <= 0.5}
               title="Zoom Out (Ctrl + Wheel Down)"
-              className="flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-40 transition-colors"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-white disabled:opacity-40 transition-all duration-150 active:scale-[0.98]"
             >
               <Minus className="h-3 w-3" />
             </button>
@@ -998,7 +1028,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
               type="button"
               onClick={handleZoomFit}
               title="Click to reset to Fit"
-              className="h-6 px-2 text-[11px] font-mono font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white rounded transition-colors tabular-nums"
+              className="h-6 px-2.5 text-[11px] font-mono font-medium text-zinc-300 hover:bg-white/10 hover:text-white rounded-full transition-colors tabular-nums"
             >
               {Math.round(canvasZoom * 100)}%
             </button>
@@ -1008,20 +1038,20 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
               onClick={handleZoomIn}
               disabled={canvasZoom >= 3.0}
               title="Zoom In (Ctrl + Wheel Up)"
-              className="flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-40 transition-colors"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-white disabled:opacity-40 transition-all duration-150 active:scale-[0.98]"
             >
               <Plus className="h-3 w-3" />
             </button>
 
-            <div className="h-3.5 w-px bg-zinc-800" />
+            <div className="h-3.5 w-px bg-white/10" />
 
             <button
               type="button"
               onClick={handleZoomFit}
-              className={`h-6 px-2 text-[10px] font-medium rounded transition-colors ${
+              className={`h-6 px-3 text-[10px] font-medium rounded-full transition-all duration-150 active:scale-[0.98] ${
                 canvasZoom === 1 && pan.x === 0 && pan.y === 0
-                  ? "bg-zinc-800 text-zinc-100"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  ? "bg-white font-semibold text-black shadow-sm"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
               }`}
               title="Fit mockup to viewport"
             >
@@ -1033,7 +1063,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
                 type="button"
                 onClick={handleZoomFit}
                 title="Reset zoom and pan"
-                className="flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+                className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-white transition-all duration-150 active:scale-[0.98]"
               >
                 <RotateCcw className="h-2.5 w-2.5" />
               </button>
@@ -1046,7 +1076,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
               type="button"
               onClick={handleCopy}
               disabled={!compositeDataUrl || isCompositing || isCapturing}
-              className="flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1 text-xs font-medium text-zinc-200 transition-all hover:border-zinc-700 hover:text-white active:scale-95 disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-[#0a0a0c] px-3.5 py-1.5 text-xs font-medium text-zinc-200 transition-all duration-150 hover:border-white/20 hover:bg-[#141417] hover:text-white active:scale-[0.98] disabled:opacity-40"
             >
               {copySuccess ? <Check className="h-3.5 w-3.5 text-white" /> : <Copy className="h-3.5 w-3.5" />}
               <span>{copySuccess ? "Copied!" : "Copy"}</span>
@@ -1057,7 +1087,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
               type="button"
               onClick={handleDownload}
               disabled={!compositeDataUrl || isCompositing || isCapturing}
-              className="flex items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-950 shadow-sm transition-all hover:bg-zinc-200 active:scale-95 disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-xs font-semibold text-black shadow-sm transition-all duration-150 hover:bg-zinc-200 active:scale-[0.98] disabled:opacity-40"
             >
               <Download className="h-3.5 w-3.5" />
               <span>Download PNG</span>
@@ -1078,13 +1108,13 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onDoubleClick={handleDoubleClick}
-          className={`studio-canvas-bg relative ${previewStage === "live" && liveUrl ? "hidden" : "flex"} flex-1 items-center justify-center overflow-hidden p-6 select-none ${
+          className={`studio-canvas-bg relative ${previewStage === "live" && liveUrl ? "hidden" : "flex"} flex-1 items-center justify-center overflow-hidden p-6 select-none bg-black ${
             isDragging ? "cursor-grabbing" : "cursor-grab"
           }`}
         >
           {/* Non-blocking update indicator when re-compositing or capturing */}
           {(isCompositing || isCapturing) && compositeDataUrl && (
-            <div className="absolute top-4 z-20 flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1 shadow-md text-xs text-zinc-300">
+            <div className="absolute top-4 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-[#0a0a0c]/95 px-3 py-1 shadow-xl backdrop-blur-md text-xs text-zinc-300">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
               <span>{isCapturing ? "Emulating viewport..." : "Updating mockup..."}</span>
             </div>
@@ -1106,7 +1136,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
                 src={compositeDataUrl}
                 alt="Device Mockup"
                 draggable={false}
-                className="max-h-[78vh] max-w-[85%] object-contain rounded border border-zinc-800/80 shadow-md"
+                className="max-h-[78vh] max-w-[85%] object-contain rounded-xl border border-white/10 shadow-2xl"
               />
             </div>
           ) : isCompositing || isCapturing ? (
@@ -1124,7 +1154,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
 
           {/* Floating Zoom & Pan Pill */}
           {compositeDataUrl && (
-            <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-950/90 px-2.5 py-1 shadow-md backdrop-blur-md text-xs text-zinc-400">
+            <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-[#0a0a0c]/90 px-3 py-1 shadow-xl backdrop-blur-md text-xs text-zinc-400">
               <span className="font-mono text-[11px] tabular-nums text-zinc-300">
                 {Math.round(canvasZoom * 100)}%
               </span>

@@ -17,11 +17,14 @@ import {
   Minus,
   Plus,
   RotateCcw,
-  Maximize2
+  Maximize2,
+  ArrowRight,
+  Monitor,
 } from "lucide-react";
 import {
   DEVICE_PRESETS,
   DEVICE_CATEGORIES,
+  CATEGORY_LABELS,
   FRAME_OPTIONS,
   BACKDROP_OPTIONS,
   ZOOM_OPTIONS
@@ -35,6 +38,12 @@ import { type LiveFrameState } from "@/lib/preview-bridge-controller";
 import { getFrameContentHeight } from "@/lib/frame-layout";
 import FRAME_METAS from "../../public/assets/frames/frame-meta.json";
 import { executeScreenshotCapture } from "@/lib/capture-client";
+
+const SECTION_TITLE = "pb-1 text-[11px] font-semibold text-zinc-500";
+const ROW = "grid grid-cols-[76px_minmax(0,1fr)] items-center gap-2";
+const ROW_LABEL = "text-xs text-zinc-400";
+const SECONDARY_BUTTON =
+  "flex h-8 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] text-[11px] font-medium text-zinc-300 transition-colors duration-150 hover:border-white/20 hover:bg-white/[0.06] hover:text-white";
 
 interface MockupStudioProps {
   onShowToast: (
@@ -133,16 +142,15 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
             value: key,
             label: p.name,
             meta: `${p.width} × ${p.height}`,
-            section: cat,
+            section: CATEGORY_LABELS[cat],
             icon,
           });
         });
     });
     items.push({
       value: "custom",
-      label: "Custom Size",
-      meta: "W × H",
-      section: "Custom",
+      label: "Custom size",
+      section: "",
       icon: "custom",
     });
     return items;
@@ -238,7 +246,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
 
     setIsCapturing(true);
     const progressId = onShowToast(
-      `Emulating ${presetToUse} viewport at ${zoomToUse}% zoom...`,
+      `Capturing ${DEVICE_PRESETS[presetToUse]?.name || "custom size"} at ${zoomToUse}% zoom…`,
       "info",
       { duration: 0 }
     );
@@ -272,7 +280,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
         setCapturedPreset(presetToUse);
         const kb = Math.round(result.payloadSizeBytes / 1024);
         onShowToast(
-          `Rendered responsive ${result.data.width} × ${result.data.height} layout (${kb} KB in ${result.transferTimeMs}ms)${result.fromCache ? " [cached]" : ""}!`,
+          `Captured ${result.data.width} × ${result.data.height} (${kb} KB${result.fromCache ? ", cached" : `, ${result.transferTimeMs} ms`})`,
           "success",
           progressId ? { id: progressId } : undefined
         );
@@ -323,7 +331,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
   const handleSnapLive = () => {
     const state = liveStateRef.current;
     if (!state.connected) {
-      onShowToast("Wait for the interactive preview to load, or use Capture Screen for this website.", "info");
+      onShowToast("Wait for the interactive preview to load, or use Capture screen for this website.", "info");
       return;
     }
     handleCaptureUrl(undefined, state.url || liveUrl, undefined, undefined, undefined, { ...state });
@@ -373,6 +381,17 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
     }
   }, [isActive, initialConfig]);
 
+  // Blob URLs from the compositor must be released when they are replaced.
+  const objectUrlRef = useRef<string | null>(null);
+  const showComposite = useCallback((url: string | null, isObjectUrl = false) => {
+    if (objectUrlRef.current && objectUrlRef.current !== url) URL.revokeObjectURL(objectUrlRef.current);
+    objectUrlRef.current = isObjectUrl ? url : null;
+    setCompositeDataUrl(url);
+  }, []);
+  useEffect(() => () => {
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+  }, []);
+
   // Re-run composite whenever options, frame, backdrop, or screenshot changes
   const runComposite = useCallback(async (isCurrent: () => boolean) => {
     if (!screenshotDataUrl) return;
@@ -388,23 +407,22 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
         fitMode: fitMode,
         zoomLevel: captureSource === "url" ? 100 : parseInt(selectedZoom, 10) || 100,
       });
-      if (!isCurrent()) return;
-      setCompositeDataUrl(result);
-      const img = new Image();
-      img.onload = () => {
-        if (isCurrent()) setCompositeDims(`${img.naturalWidth} × ${img.naturalHeight} px`);
-      };
-      img.src = result;
+      if (!isCurrent()) {
+        if (result.isObjectUrl) URL.revokeObjectURL(result.url);
+        return;
+      }
+      showComposite(result.url, result.isObjectUrl);
+      setCompositeDims(`${result.width} × ${result.height} px`);
     } catch (err: unknown) {
       if (!isCurrent()) return;
-      setCompositeDataUrl(null);
+      showComposite(null);
       console.error("Composite failed:", err);
       const msg = err instanceof Error ? err.message : "Compositing failed";
       onShowToast(`Failed: ${msg}`, "error");
     } finally {
       if (isCurrent()) setIsCompositing(false);
     }
-  }, [screenshotDataUrl, selectedFrame, selectedBackdrop, autoNotch, notchColor, capturedUrl, fitMode, onShowToast, selectedZoom, captureSource]);
+  }, [screenshotDataUrl, selectedFrame, selectedBackdrop, autoNotch, notchColor, capturedUrl, fitMode, onShowToast, selectedZoom, captureSource, showComposite]);
 
   useEffect(() => {
     let active = true;
@@ -478,7 +496,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
         setCaptureSource("screen");
         setCapturedPreset(null);
         setCapturedUrl("");
-        onShowToast("Captured frame successfully!", "success");
+        onShowToast("Captured your screen", "success");
       }
     } catch (err: unknown) {
       if (!(err instanceof Error && err.name === "NotAllowedError")) {
@@ -526,7 +544,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === "string") importImage(reader.result, "Loaded image!");
+      if (typeof reader.result === "string") importImage(reader.result, "Image loaded");
     };
     reader.onerror = () => onShowToast("Could not read image file.", "error");
     reader.readAsDataURL(file);
@@ -547,7 +565,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
             const reader = new FileReader();
             reader.onload = (loadEvt) => {
               const dataUrl = loadEvt.target?.result as string;
-              if (dataUrl) importImage(dataUrl, "Pasted image from clipboard!");
+              if (dataUrl) importImage(dataUrl, "Pasted image from clipboard");
             };
             reader.readAsDataURL(file);
             break;
@@ -572,7 +590,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
         }),
       ]);
       setCopySuccess(true);
-      onShowToast("Copied mockup to clipboard!", "success");
+      onShowToast("Copied mockup to clipboard", "success");
       setTimeout(() => setCopySuccess(false), 2000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Browser permission denied";
@@ -589,7 +607,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    onShowToast("Downloaded PNG mockup", "success");
+    onShowToast("Downloaded PNG", "success");
   };
 
   const handleFrameSelect = (frameId: string) => {
@@ -639,18 +657,25 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
     setPan({ x: 0, y: 0 });
   };
 
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    // Zoom on Ctrl/Cmd + wheel or trackpad pinch
-    if (e.ctrlKey || e.metaKey) {
+  // Zoom on Ctrl/Cmd + wheel or trackpad pinch. React's onWheel is passive, so
+  // preventDefault there cannot stop the browser from zooming the whole page.
+  useEffect(() => {
+    const el = canvasContainerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
       const delta = -e.deltaY * 0.002;
-      setCanvasZoom((prev) => {
-        const next = Math.min(3.0, Math.max(0.5, Math.round((prev + delta) * 100) / 100));
-        if (next <= 1.0) setPan({ x: 0, y: 0 });
-        return next;
-      });
-    }
-  };
+      setCanvasZoom((prev) => Math.min(3.0, Math.max(0.5, Math.round((prev + delta) * 100) / 100)));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  // Zooming back to 100% or less recenters the mockup.
+  useEffect(() => {
+    if (canvasZoom <= 1) setPan((prev) => (prev.x === 0 && prev.y === 0 ? prev : { x: 0, y: 0 }));
+  }, [canvasZoom]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.button === 0) {
@@ -685,253 +710,202 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
 
   return (
     <div className="flex min-h-0 flex-1 flex-col lg:flex-row overflow-auto lg:overflow-hidden bg-black">
-      {/* Settings & Controls Sidebar (Zero nested card enclosures) */}
-      <div className="w-full lg:w-80 flex-shrink-0 border-b lg:border-b-0 lg:border-r border-white/10 bg-[#0a0a0c] p-4 overflow-y-auto space-y-4">
-        {/* Source URL & Capture */}
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-zinc-400">
-              Target URL
-            </span>
-          </div>
+      {/* Settings sidebar: a compact inspector, label column on the left */}
+      <aside className="w-full flex-shrink-0 overflow-y-auto border-b border-white/10 bg-[#0a0a0c] lg:w-80 lg:border-b-0 lg:border-r">
+        {/* Source */}
+        <section aria-labelledby="mockup-source" className="space-y-2 border-b border-white/[0.06] p-4">
+          <h2 id="mockup-source" className={SECTION_TITLE}>Source</h2>
 
-          <form aria-label="Open live website" onSubmit={handleOpenLive} className="space-y-2">
-            <div className="relative flex items-center">
-              <Globe className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-zinc-500" />
+          <form aria-label="Open live website" onSubmit={handleOpenLive}>
+            <div className="flex h-8 items-center rounded-lg border border-white/10 bg-black pl-2.5 pr-[3px] transition-colors duration-150 focus-within:border-white/30">
+              <Globe aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
               <input
                 type="text"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
                 placeholder="https://yourwebsite.com"
-                className="w-full rounded-full border border-white/10 bg-black py-1.5 pl-8 pr-8 text-xs text-white placeholder-zinc-500 outline-none transition-all duration-150 focus:border-white/30 focus:bg-[#0a0a0c] focus:ring-1 focus:ring-white/20"
+                aria-label="Website URL"
+                className="min-w-0 flex-1 bg-transparent px-2 text-xs text-white placeholder-zinc-500 outline-none"
               />
               {urlInput && (
                 <button
                   type="button"
                   onClick={() => setUrlInput("")}
-                  className="absolute right-2.5 rounded-full p-0.5 text-zinc-500 hover:text-white transition-colors duration-150"
-                  title="Clear input"
+                  aria-label="Clear URL"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-zinc-500 transition-colors duration-150 hover:text-white"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-3 w-3" />
                 </button>
               )}
+              <button
+                type="submit"
+                disabled={isCapturing}
+                aria-label="Open website"
+                title="Open website"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white/10 text-white transition-colors duration-150 hover:bg-white/20 disabled:opacity-40"
+              >
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
             </div>
-
-            <button
-              type="submit"
-              disabled={isCapturing}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-white px-3.5 py-2 text-xs font-semibold text-black transition-all duration-150 hover:bg-zinc-200 active:scale-[0.98] shadow-sm disabled:opacity-50"
-            >
-              {isCapturing ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-black" />
-                  <span>Emulating Viewport...</span>
-                </>
-              ) : (
-                <>
-                  <Camera className="h-3.5 w-3.5 text-black" />
-                  <span>Open website</span>
-                </>
-              )}
-            </button>
           </form>
 
           <button
             type="button"
             onClick={handleSnapLive}
             disabled={!liveUrl || !liveReady || isCapturing}
-            className="flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 py-2 text-xs font-semibold text-white hover:bg-white/10 hover:border-white/20 active:scale-[0.98] disabled:opacity-40 transition-all duration-150"
+            className="flex h-8 w-full items-center justify-center gap-2 rounded-lg bg-white text-xs font-semibold text-black transition-colors duration-150 hover:bg-zinc-200 disabled:bg-white/10 disabled:text-zinc-500"
           >
-            <Camera className="h-3.5 w-3.5" />
-            <span>{isCapturing ? "Snapping…" : "Snap view"}</span>
+            {isCapturing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+            <span>{isCapturing ? "Capturing…" : "Snap view"}</span>
           </button>
 
-          {/* Alternative Ingestion Buttons */}
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={handleCaptureScreen}
-              className="flex-1 rounded-full border border-white/10 bg-white/5 py-1.5 text-[11px] font-medium text-zinc-300 hover:bg-white/10 hover:border-white/20 hover:text-white active:scale-[0.98] transition-all duration-150 text-center"
-            >
-              Capture Screen
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={handleCaptureScreen} className={SECONDARY_BUTTON}>
+              <Monitor className="h-3.5 w-3.5 text-zinc-500" />
+              <span>Capture screen</span>
             </button>
-
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex-1 rounded-full border border-white/10 bg-white/5 py-1.5 text-[11px] font-medium text-zinc-300 hover:bg-white/10 hover:border-white/20 hover:text-white active:scale-[0.98] transition-all duration-150 text-center"
-            >
-              Upload Image
+            <button type="button" onClick={() => fileInputRef.current?.click()} className={SECONDARY_BUTTON}>
+              <Upload className="h-3.5 w-3.5 text-zinc-500" />
+              <span>Upload image</span>
             </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileUpload}
-            />
-          </div>
-        </div>
-
-        <div className="h-px bg-white/10" />
-
-        {/* Viewport Preset */}
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-zinc-400">
-              Viewport
-            </span>
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
           </div>
 
-          <CustomDropdown
-            value={selectedPreset}
-            onChange={handlePresetChange}
-            items={viewportItems}
-          />
+          <p className="text-[11px] leading-relaxed text-zinc-500">
+            {liveUrl && !liveReady && !isCapturing
+              ? "Loading the website…"
+              : "Open a website, scroll to the shot you want, then snap it. You can also paste an image."}
+          </p>
+        </section>
 
-          {/* Custom Size Fields */}
+        {/* Capture: settings that change the captured page */}
+        <section aria-labelledby="mockup-capture" className="space-y-2 border-b border-white/[0.06] p-4">
+          <h2 id="mockup-capture" className={SECTION_TITLE}>Capture</h2>
+
+          <div className={ROW}>
+            <span className={ROW_LABEL}>Viewport</span>
+            <CustomDropdown value={selectedPreset} onChange={handlePresetChange} items={viewportItems} align="right" showTriggerMeta={false} />
+          </div>
+
           {selectedPreset === "custom" && (
-            <div className="flex items-center gap-2">
-              <div className="flex flex-1 items-center rounded-full border border-white/10 bg-black px-3 py-1.5 text-xs">
-                <span className="mr-1.5 font-medium text-zinc-500">W</span>
-                <input
-                  type="number"
-                  value={customW}
-                  onChange={(e) => setCustomW(parseInt(e.target.value, 10) || 1440)}
-                  className="w-full bg-transparent text-white outline-none tabular-nums"
-                />
-                <span className="text-[10px] font-mono text-zinc-500">PX</span>
-              </div>
-              <span className="text-zinc-600">×</span>
-              <div className="flex flex-1 items-center rounded-full border border-white/10 bg-black px-3 py-1.5 text-xs">
-                <span className="mr-1.5 font-medium text-zinc-500">H</span>
-                <input
-                  type="number"
-                  value={customH}
-                  onChange={(e) => setCustomH(parseInt(e.target.value, 10) || 900)}
-                  className="w-full bg-transparent text-white outline-none tabular-nums"
-                />
-                <span className="text-[10px] font-mono text-zinc-500">PX</span>
+            <div className={ROW}>
+              <span className={ROW_LABEL}>Size</span>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <label className="flex h-8 min-w-0 flex-1 items-center rounded-lg border border-white/10 bg-black px-2.5 text-xs focus-within:border-white/30">
+                  <span className="mr-1.5 text-zinc-500">W</span>
+                  <input
+                    type="number"
+                    value={customW}
+                    onChange={(e) => setCustomW(parseInt(e.target.value, 10) || 1440)}
+                    aria-label="Custom width"
+                    className="w-full min-w-0 bg-transparent text-white outline-none tabular-nums"
+                  />
+                </label>
+                <label className="flex h-8 min-w-0 flex-1 items-center rounded-lg border border-white/10 bg-black px-2.5 text-xs focus-within:border-white/30">
+                  <span className="mr-1.5 text-zinc-500">H</span>
+                  <input
+                    type="number"
+                    value={customH}
+                    onChange={(e) => setCustomH(parseInt(e.target.value, 10) || 900)}
+                    aria-label="Custom height"
+                    className="w-full min-w-0 bg-transparent text-white outline-none tabular-nums"
+                  />
+                </label>
               </div>
             </div>
           )}
 
-          {/* Full Page Capture Toggle */}
-          <div className="flex items-center justify-between py-0.5">
-            <span className="text-xs font-medium text-zinc-300">Full Page Capture</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={fullPage}
-              onClick={() => {
-                const next = !fullPage;
-                setFullPage(next);
-                saveSettings({ fullPage: next });
-              }}
-              className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-150 ease-out focus:outline-none ${
-                fullPage
-                  ? "border-white/30 bg-white"
-                  : "border-white/15 bg-white/10 hover:border-white/25"
-              }`}
-            >
-              <span
-                aria-hidden="true"
-                className={`pointer-events-none inline-block h-2.5 w-2.5 rounded-full transition-transform duration-150 ease-out ${
-                  fullPage
-                    ? "translate-x-3.5 bg-black"
-                    : "translate-x-0.5 bg-zinc-400"
-                }`}
-              />
-            </button>
-          </div>
-        </div>
-
-        <div className="h-px bg-white/10" />
-
-        {/* Frame & Presentation */}
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-zinc-400">
-              Frame &amp; Presentation
-            </span>
+          <div className={ROW}>
+            <span className={ROW_LABEL}>Zoom</span>
+            <CustomDropdown value={selectedZoom} onChange={handleZoomChange} items={zoomItems} align="right" />
           </div>
 
-          <div className="flex flex-col gap-3">
-            {/* Frame Select */}
-            <div>
-              <label className="block text-[10px] font-medium text-zinc-400 mb-1">Hardware Frame</label>
-              <CustomDropdown
-                value={selectedFrame}
-                onChange={handleFrameSelect}
-                items={frameItems}
-                align="left"
-                showTriggerMeta={false}
-              />
-            </div>
-
-            {/* Backdrop Select */}
-            <div>
-              <label className="block text-[10px] font-medium text-zinc-400 mb-1">Backdrop Style</label>
-              <CustomDropdown
-                value={selectedBackdrop}
-                onChange={handleBackdropChange}
-                items={backdropItems}
-                align="right"
-                showTriggerMeta={false}
-              />
-            </div>
-          </div>
-
-          {/* Canvas Screen Fitting (Sleek Segmented Pill, Zero Nested Box) */}
-          <div>
-            <label className="block text-[10px] font-medium text-zinc-400 mb-1">Canvas Screen Fitting</label>
-            <div className="inline-flex w-full rounded-full border border-white/10 bg-[#0a0a0c] p-1 text-xs gap-1 shadow-inner">
+          <div className={ROW}>
+            <span className={ROW_LABEL}>Full page</span>
+            <div className="flex h-8 items-center justify-end">
               <button
                 type="button"
+                role="switch"
+                aria-checked={fullPage}
+                aria-label="Full page"
                 onClick={() => {
-                  setFitMode("smart");
-                  saveSettings({ fitMode: "smart" });
+                  const next = !fullPage;
+                  setFullPage(next);
+                  saveSettings({ fullPage: next });
                 }}
-                className={`flex-1 rounded-full py-1 text-center text-xs transition-all duration-150 active:scale-[0.98] ${
-                  fitMode === "smart" || fitMode === "cover"
-                    ? "bg-white font-semibold text-black shadow-sm"
-                    : "text-zinc-400 hover:text-white"
+                className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-150 ease-out ${
+                  fullPage ? "border-white/30 bg-white" : "border-white/15 bg-white/10 hover:border-white/25"
                 }`}
               >
-                Responsive Fill
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setFitMode("contain");
-                  saveSettings({ fitMode: "contain" });
-                }}
-                className={`flex-1 rounded-full py-1 text-center text-xs transition-all duration-150 active:scale-[0.98] ${
-                  fitMode === "contain"
-                    ? "bg-white font-semibold text-black shadow-sm"
-                    : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                Fit Whole Page
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-2.5 w-2.5 rounded-full transition-transform duration-150 ease-out ${
+                    fullPage ? "translate-x-3.5 bg-black" : "translate-x-0.5 bg-zinc-400"
+                  }`}
+                />
               </button>
             </div>
           </div>
+        </section>
 
-          {/* Page Zoom Select */}
-          <div>
-            <label className="block text-[10px] font-medium text-zinc-400 mb-1">Page Zoom Level</label>
-            <CustomDropdown
-              value={selectedZoom}
-              onChange={handleZoomChange}
-              items={zoomItems}
-            />
+        {/* Mockup: presentation only, no new capture needed */}
+        <section aria-labelledby="mockup-presentation" className="space-y-2 p-4">
+          <h2 id="mockup-presentation" className={SECTION_TITLE}>Mockup</h2>
+
+          <div className={ROW}>
+            <span className={ROW_LABEL}>Frame</span>
+            <CustomDropdown value={selectedFrame} onChange={handleFrameSelect} items={frameItems} align="right" showTriggerMeta={false} />
           </div>
 
-          {/* iPhone Notch settings */}
+          <div className={ROW}>
+            <span className={ROW_LABEL}>Backdrop</span>
+            <CustomDropdown value={selectedBackdrop} onChange={handleBackdropChange} items={backdropItems} align="right" showTriggerMeta={false} />
+          </div>
+
+          <div className={ROW}>
+            <span className={ROW_LABEL}>Fit</span>
+            <div role="group" aria-label="Screen fit" className="grid h-8 grid-cols-2 gap-0.5 rounded-lg border border-white/10 bg-black p-[3px]">
+              {([
+                { label: "Fill width", value: "smart" },
+                { label: "Whole page", value: "contain" },
+              ] as const).map((option) => {
+                const active = option.value === "contain" ? fitMode === "contain" : fitMode !== "contain";
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => {
+                      setFitMode(option.value);
+                      saveSettings({ fitMode: option.value });
+                    }}
+                    className={`rounded-md text-[11px] transition-colors duration-150 ${
+                      active ? "bg-white/[0.12] font-medium text-white" : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {selectedFrame.toLowerCase().includes("iphone") && (
-            <div className="flex items-center justify-between border-t border-white/10 pt-2.5">
-              <span className="text-[10px] font-medium text-zinc-400">Header Theme</span>
-              <div className="flex items-center gap-3">
+            <div className={ROW}>
+              <span className={ROW_LABEL}>Status bar</span>
+              <div className="flex h-8 items-center justify-between gap-2">
+                <label className="flex cursor-pointer items-center gap-1.5 text-xs text-zinc-300">
+                  <input
+                    type="checkbox"
+                    checked={autoNotch}
+                    onChange={(e) => {
+                      setAutoNotch(e.target.checked);
+                      saveSettings({ autoNotch: e.target.checked });
+                    }}
+                    className="h-3.5 w-3.5 rounded accent-white"
+                  />
+                  <span>Match page</span>
+                </label>
                 <input
                   type="color"
                   value={notchColor}
@@ -940,26 +914,15 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
                     setAutoNotch(false);
                     saveSettings({ notchColor: e.target.value, autoNotch: false });
                   }}
-                  className="h-5 w-7 cursor-pointer rounded border border-white/10 bg-transparent"
-                  title="Pick Header Color"
+                  aria-label="Status bar color"
+                  title="Status bar color"
+                  className="status-color-dot h-5 w-5 cursor-pointer rounded-full"
                 />
-                <label className="flex cursor-pointer items-center gap-1.5 text-xs text-zinc-400">
-                  <input
-                    type="checkbox"
-                    checked={autoNotch}
-                    onChange={(e) => {
-                      setAutoNotch(e.target.checked);
-                      saveSettings({ autoNotch: e.target.checked });
-                    }}
-                    className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-white text-white focus:ring-0"
-                  />
-                  <span>Auto</span>
-                </label>
               </div>
             </div>
           )}
-        </div>
-      </div>
+        </section>
+      </aside>
 
       {/* Canvas Mockup Preview Surface */}
       <div className="flex min-h-[420px] lg:min-h-0 flex-1 flex-col overflow-hidden">
@@ -970,9 +933,9 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
               type="button"
               onClick={() => setPreviewStage("live")}
               disabled={!liveUrl}
-              className={`rounded-full px-3 py-1 transition-all duration-150 active:scale-[0.98] disabled:opacity-40 ${
+              className={`rounded-full px-3 py-1 transition duration-150 active:scale-[0.98] disabled:opacity-40 ${
                 previewStage === "live"
-                  ? "bg-white font-semibold text-black shadow-sm"
+                  ? "bg-white/[0.12] font-medium text-white"
                   : "text-zinc-400 hover:text-white hover:bg-white/5"
               }`}
             >
@@ -981,9 +944,9 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
             <button
               type="button"
               onClick={() => setPreviewStage("mockup")}
-              className={`rounded-full px-3 py-1 transition-all duration-150 active:scale-[0.98] ${
+              className={`rounded-full px-3 py-1 transition duration-150 active:scale-[0.98] ${
                 previewStage === "mockup"
-                  ? "bg-white font-semibold text-black shadow-sm"
+                  ? "bg-white/[0.12] font-medium text-white"
                   : "text-zinc-400 hover:text-white hover:bg-white/5"
               }`}
             >
@@ -1004,10 +967,10 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
               <button
                 type="button"
                 onClick={() => handleCaptureUrl(undefined, urlInput, selectedPreset, selectedFrame)}
-                className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-medium text-zinc-300 hover:bg-white/10 hover:border-white/20 hover:text-white active:scale-[0.98] transition-all duration-150"
+                className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-medium text-zinc-300 hover:bg-white/10 hover:border-white/20 hover:text-white active:scale-[0.98] transition duration-150"
               >
                 <RefreshCw className="h-2.5 w-2.5" />
-                <span>Re-render responsive for {DEVICE_PRESETS[selectedPreset]?.name || selectedPreset}</span>
+                <span>Recapture at {DEVICE_PRESETS[selectedPreset]?.name || "custom size"}</span>
               </button>
             )}
           </div>
@@ -1019,7 +982,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
               onClick={handleZoomOut}
               disabled={canvasZoom <= 0.5}
               title="Zoom Out (Ctrl + Wheel Down)"
-              className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-white disabled:opacity-40 transition-all duration-150 active:scale-[0.98]"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-white disabled:opacity-40 transition duration-150 active:scale-[0.98]"
             >
               <Minus className="h-3 w-3" />
             </button>
@@ -1038,7 +1001,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
               onClick={handleZoomIn}
               disabled={canvasZoom >= 3.0}
               title="Zoom In (Ctrl + Wheel Up)"
-              className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-white disabled:opacity-40 transition-all duration-150 active:scale-[0.98]"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-white disabled:opacity-40 transition duration-150 active:scale-[0.98]"
             >
               <Plus className="h-3 w-3" />
             </button>
@@ -1048,9 +1011,9 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
             <button
               type="button"
               onClick={handleZoomFit}
-              className={`h-6 px-3 text-[10px] font-medium rounded-full transition-all duration-150 active:scale-[0.98] ${
+              className={`h-6 px-3 text-[10px] font-medium rounded-full transition duration-150 active:scale-[0.98] ${
                 canvasZoom === 1 && pan.x === 0 && pan.y === 0
-                  ? "bg-white font-semibold text-black shadow-sm"
+                  ? "bg-white/[0.12] font-medium text-white"
                   : "text-zinc-400 hover:text-white hover:bg-white/5"
               }`}
               title="Fit mockup to viewport"
@@ -1063,7 +1026,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
                 type="button"
                 onClick={handleZoomFit}
                 title="Reset zoom and pan"
-                className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-white transition-all duration-150 active:scale-[0.98]"
+                className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-white transition duration-150 active:scale-[0.98]"
               >
                 <RotateCcw className="h-2.5 w-2.5" />
               </button>
@@ -1076,10 +1039,10 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
               type="button"
               onClick={handleCopy}
               disabled={!compositeDataUrl || isCompositing || isCapturing}
-              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-[#0a0a0c] px-3.5 py-1.5 text-xs font-medium text-zinc-200 transition-all duration-150 hover:border-white/20 hover:bg-[#141417] hover:text-white active:scale-[0.98] disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-[#0a0a0c] px-3.5 py-1.5 text-xs font-medium text-zinc-200 transition duration-150 hover:border-white/20 hover:bg-[#141417] hover:text-white active:scale-[0.98] disabled:opacity-40"
             >
               {copySuccess ? <Check className="h-3.5 w-3.5 text-white" /> : <Copy className="h-3.5 w-3.5" />}
-              <span>{copySuccess ? "Copied!" : "Copy"}</span>
+              <span>{copySuccess ? "Copied" : "Copy"}</span>
             </button>
 
             {/* Download Button */}
@@ -1087,7 +1050,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
               type="button"
               onClick={handleDownload}
               disabled={!compositeDataUrl || isCompositing || isCapturing}
-              className="flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-xs font-semibold text-black shadow-sm transition-all duration-150 hover:bg-zinc-200 active:scale-[0.98] disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-xs font-semibold text-black shadow-sm transition duration-150 hover:bg-zinc-200 active:scale-[0.98] disabled:opacity-40"
             >
               <Download className="h-3.5 w-3.5" />
               <span>Download PNG</span>
@@ -1102,7 +1065,6 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
         {/* Live Canvas Viewport */}
         <div
           ref={canvasContainerRef}
-          onWheel={handleWheel}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
@@ -1116,7 +1078,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
           {(isCompositing || isCapturing) && compositeDataUrl && (
             <div className="absolute top-4 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-[#0a0a0c]/95 px-3 py-1 shadow-xl backdrop-blur-md text-xs text-zinc-300">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
-              <span>{isCapturing ? "Emulating viewport..." : "Updating mockup..."}</span>
+              <span>{isCapturing ? "Capturing…" : "Updating mockup…"}</span>
             </div>
           )}
 
@@ -1143,7 +1105,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
             <div className="flex flex-col items-center gap-2 pointer-events-none">
               <Loader2 className="h-7 w-7 animate-spin text-white" />
               <span className="text-xs text-zinc-400">
-                {isCapturing ? "Emulating responsive device viewport..." : "Compositing realistic device frame..."}
+                {isCapturing ? "Capturing…" : "Building mockup…"}
               </span>
             </div>
           ) : (

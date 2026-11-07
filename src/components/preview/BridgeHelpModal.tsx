@@ -30,7 +30,7 @@ export function BridgeHelpModal({ isOpen, onClose, viewerOrigin }: BridgeHelpMod
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-2xl rounded-2xl border border-white/10 bg-[#0a0a0c]/98 backdrop-blur-xl p-6 shadow-2xl text-zinc-200"
+        className="relative w-full max-w-2xl rounded-2xl border border-white/10 bg-[#0a0a0c]/[0.98] backdrop-blur-xl p-6 shadow-2xl text-zinc-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -74,7 +74,7 @@ export function BridgeHelpModal({ isOpen, onClose, viewerOrigin }: BridgeHelpMod
               <button
                 type="button"
                 onClick={() => handleCopy(cspHeader, setCopiedCsp)}
-                className="absolute right-2 top-2 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] text-zinc-300 hover:bg-white/10 hover:text-white active:scale-[0.98] transition-all flex items-center gap-1"
+                className="absolute right-2 top-2 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] text-zinc-300 hover:bg-white/10 hover:text-white active:scale-[0.98] transition flex items-center gap-1"
               >
                 {copiedCsp ? <Check className="h-3 w-3 text-white" /> : <Copy className="h-3 w-3" />}
                 <span>{copiedCsp ? "Copied" : "Copy"}</span>
@@ -99,7 +99,7 @@ export function BridgeHelpModal({ isOpen, onClose, viewerOrigin }: BridgeHelpMod
               <button
                 type="button"
                 onClick={() => handleCopy(scriptTag, setCopiedScript)}
-                className="absolute right-2 top-2 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] text-zinc-300 hover:bg-white/10 hover:text-white active:scale-[0.98] transition-all flex items-center gap-1"
+                className="absolute right-2 top-2 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] text-zinc-300 hover:bg-white/10 hover:text-white active:scale-[0.98] transition flex items-center gap-1"
               >
                 {copiedScript ? <Check className="h-3 w-3 text-white" /> : <Copy className="h-3 w-3" />}
                 <span>{copiedScript ? "Copied" : "Copy"}</span>
@@ -124,7 +124,7 @@ export function BridgeHelpModal({ isOpen, onClose, viewerOrigin }: BridgeHelpMod
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full bg-white px-4 py-1.5 text-xs font-semibold text-black hover:bg-zinc-200 active:scale-[0.98] transition-all shadow-sm"
+            className="rounded-full bg-white px-4 py-1.5 text-xs font-semibold text-black hover:bg-zinc-200 active:scale-[0.98] transition shadow-sm"
           >
             Got it
           </button>

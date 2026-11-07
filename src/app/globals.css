@@ -90,3 +90,47 @@ input,
 select {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Visible keyboard focus. Mouse clicks keep the quiet look (:focus-visible). */
+:is(button, a, select, [role="switch"], [role="option"], [role="menuitem"], input[type="checkbox"], input[type="color"]):focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.75) !important;
+  outline-offset: 2px;
+}
+
+/* Responsive Studio: viewports wrap into centered rows. "safe" keeps a row
+   that is wider than the canvas from overflowing off the left edge. */
+.studio-rows {
+  justify-content: center;
+  justify-content: safe center;
+}
+
+/* Narrow viewport cards: hide the dimensions first, then secondary icons,
+   before the device name is clipped. Widths are the unscaled card width. */
+.viewport-toolbar {
+  container-type: inline-size;
+}
+
+@container (max-width: 430px) {
+  .viewport-toolbar .card-dims {
+    display: none;
+  }
+}
+
+@container (max-width: 350px) {
+  .viewport-toolbar .card-secondary {
+    display: none;
+  }
+}
+
+/* iPhone status bar color: a round swatch with a ring that stays visible on black */
+.status-color-dot {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+.status-color-dot::-webkit-color-swatch-wrapper { padding: 0; }
+.status-color-dot::-webkit-color-swatch { border: 0; border-radius: 9999px; }
+.status-color-dot::-moz-color-swatch { border: 0; border-radius: 9999px; }

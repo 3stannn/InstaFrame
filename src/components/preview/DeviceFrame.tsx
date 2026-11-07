@@ -10,7 +10,6 @@ import {
   Layers,
   AlertCircle,
   Wifi,
-  Sliders,
   Check,
   Shield,
   Globe,
@@ -48,6 +47,8 @@ export interface DeviceFrameProps {
   isMixedContent?: boolean;
   bridgeConnected?: boolean;
   bridgeCapabilities?: BridgeCapabilities;
+  /** False for the last remaining viewport: its close button is disabled. */
+  canRemove?: boolean;
   onRotate: (id: string) => void;
   onReload: (id: string) => void;
   onRemove: (id: string) => void;
@@ -77,6 +78,7 @@ export function DeviceFrame({
   isMixedContent,
   bridgeConnected,
   bridgeCapabilities,
+  canRemove = true,
   onRotate,
   onReload,
   onRemove,
@@ -169,24 +171,17 @@ export function DeviceFrame({
         }}
       >
         {/* Frame Toolbar */}
-        <div className="flex h-[36px] shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-[#0a0a0c] px-2.5 select-none">
+        <div className="viewport-toolbar flex h-[36px] shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-[#0a0a0c] pl-2.5 pr-[5.5px] select-none">
           {/* Left: Device Name, Dimensions Badge, Bridge Status */}
           <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
-            {/* Loading / Active Status Dot */}
-            <span
-              className={`h-2 w-2 rounded-full flex-shrink-0 transition-colors ${
-                previewMode === "live" && iframeLoading
-                  ? "bg-zinc-400 animate-pulse"
-                  : previewMode === "preview" && isSnapshotLoading
-                  ? "bg-zinc-400 animate-pulse"
-                  : "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.4)]"
-              }`}
-              title={
-                previewMode === "live" && iframeLoading
-                  ? "Iframe loading..."
-                  : "Viewport active"
-              }
-            />
+            {/* Status dot: only while the viewport is loading */}
+            {((previewMode === "live" && iframeLoading && Boolean(url)) || (previewMode === "preview" && isSnapshotLoading)) && (
+              <span
+                className="h-2 w-2 shrink-0 rounded-full bg-zinc-400 animate-pulse"
+                title="Loading"
+                aria-label="Loading"
+              />
+            )}
 
             {/* Viewport Name */}
             <span className="min-w-0 truncate text-xs font-semibold tracking-[-0.015em] text-white" title={device.name}>
@@ -197,23 +192,21 @@ export function DeviceFrame({
             <button
               type="button"
               onClick={() => setEditDimensionsOpen((prev) => !prev)}
-              title="Click to edit custom dimensions"
-              className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[10px] tabular-nums text-zinc-300 hover:bg-white/10 hover:border-white/20 active:scale-[0.98] transition-all duration-150"
+              title="Edit dimensions"
+              aria-label={`Edit dimensions, ${device.width} by ${device.height}`}
+              className="card-dims shrink-0 whitespace-nowrap rounded px-1 text-[11px] tabular-nums text-zinc-400 transition-colors duration-150 hover:text-white"
             >
-              <span>
-                {device.width} × {device.height}
-              </span>
-              {!compactToolbar && <Sliders className="h-2.5 w-2.5 opacity-60" />}
+              {device.width} × {device.height}
             </button>
 
             {/* Mode B: Cooperative Bridge Status Badge */}
             {previewMode === "live" && bridgeConnected && (
               <span
-                className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-white/5 px-2 py-0.5 text-[9.5px] font-medium text-zinc-200 border border-white/10"
+                className="card-secondary flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-white/5 px-2 py-0.5 text-[9.5px] font-medium text-zinc-200 border border-white/10"
                 title={`Bridge Connected: Sync scroll ${bridgeCapabilities?.scroll ? "active" : "disabled"}`}
               >
                 <Wifi className="h-2.5 w-2.5 text-zinc-200 animate-pulse" />
-                <span className={compactToolbar ? "sr-only" : undefined}>Bridge Active</span>
+                <span className={compactToolbar ? "sr-only" : undefined}>Bridge active</span>
               </span>
             )}
 
@@ -228,7 +221,7 @@ export function DeviceFrame({
                     ? "Interactive preview with page and scroll tracking. Click to try direct loading."
                     : "Direct website preview. Click to enable interactive page and scroll tracking."
                 }
-                className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[9.5px] font-medium transition-all duration-150 active:scale-[0.98] ${
+                className={`card-secondary flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[9.5px] font-medium transition-colors duration-150 ${
                   isProxied
                     ? "bg-white/15 text-white border border-white/20 hover:bg-white/20"
                     : "text-zinc-400 hover:text-white bg-white/5 border border-white/10 hover:bg-white/10"
@@ -246,8 +239,9 @@ export function DeviceFrame({
             <button
               type="button"
               onClick={() => onRotate(device.id)}
-              title={`Rotate to ${device.rotated ? "Portrait" : "Landscape"} (${device.height} × ${device.width})`}
-              className={`rounded-full p-1.5 transition-all duration-150 active:scale-[0.98] ${
+              title={`Rotate to ${device.rotated ? "portrait" : "landscape"} (${device.height} × ${device.width})`}
+              aria-label="Rotate viewport"
+              className={`rounded-full p-1.5 transition duration-150 ${
                 device.rotated
                   ? "bg-white/20 text-white border border-white/20 shadow-sm"
                   : "text-zinc-400 hover:bg-white/10 hover:text-white"
@@ -261,7 +255,8 @@ export function DeviceFrame({
               type="button"
               onClick={() => onReload(device.id)}
               title="Reload viewport"
-              className="rounded-full p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white active:scale-[0.98] transition-all duration-150"
+              aria-label="Reload viewport"
+              className="rounded-full p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white transition duration-150"
             >
               <RefreshCw
                 className={`h-3 w-3 ${
@@ -276,8 +271,10 @@ export function DeviceFrame({
                 ref={cameraBtnRef}
                 type="button"
                 onClick={() => setCapturePopoverOpen((prev) => !prev)}
-                title="Capture Viewport (Send to Mockup Studio or Download PNG)"
-                className={`rounded-full p-1.5 transition-all duration-150 active:scale-[0.98] ${
+                title="Capture viewport"
+                aria-label="Capture viewport"
+                aria-expanded={capturePopoverOpen}
+                className={`rounded-full p-1.5 transition duration-150 ${
                   capturePopoverOpen
                     ? "bg-white/20 text-white border border-white/20 shadow-sm"
                     : "text-zinc-400 hover:bg-white/10 hover:text-white"
@@ -305,8 +302,9 @@ export function DeviceFrame({
               <button
                 type="button"
                 onClick={onOpenBridgeHelp}
-                title="Cooperative Bridge Setup Guide"
-                className="rounded-full p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white active:scale-[0.98] transition-all duration-150"
+                title="Preview bridge setup"
+                aria-label="Preview bridge setup"
+                className="card-secondary rounded-full p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white transition duration-150"
               >
                 <Wifi className="h-3 w-3" />
               </button>
@@ -316,8 +314,9 @@ export function DeviceFrame({
             <button
               type="button"
               onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
-              title="Open website in new browser tab"
-              className="rounded-full p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white active:scale-[0.98] transition-all duration-150"
+              title="Open in new tab"
+              aria-label="Open in new tab"
+              className="card-secondary rounded-full p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white transition duration-150"
             >
               <ExternalLink className="h-3 w-3" />
             </button>
@@ -326,8 +325,10 @@ export function DeviceFrame({
             <button
               type="button"
               onClick={() => onRemove(device.id)}
-              title="Close viewport"
-              className="rounded-full p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white active:scale-[0.98] transition-all duration-150"
+              disabled={!canRemove}
+              title={canRemove ? "Close viewport" : "The last viewport can't be closed"}
+              aria-label="Close viewport"
+              className="rounded-full p-1.5 text-zinc-400 transition-colors duration-150 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400"
             >
               <X className="h-3 w-3" />
             </button>
@@ -336,12 +337,12 @@ export function DeviceFrame({
 
         {/* Inline Dimensions Editor Popover */}
         {editDimensionsOpen && (
-          <div className="absolute top-[38px] left-2.5 z-30 w-64 rounded-xl border border-white/10 bg-[#0a0a0c]/98 backdrop-blur-xl p-3 shadow-2xl">
+          <div className="absolute top-[38px] left-2.5 z-30 w-64 rounded-xl border border-white/10 bg-[#0a0a0c]/[0.98] backdrop-blur-xl p-3 shadow-2xl">
             <form onSubmit={handleApplyDimensions} className="space-y-2">
-              <div className="text-[11px] font-semibold tracking-[-0.015em] text-white">Custom Dimensions</div>
+              <div className="text-[11px] font-semibold tracking-[-0.015em] text-white">Custom dimensions</div>
               <div className="flex items-center gap-2">
                 <div>
-                  <label className="text-[9.5px] uppercase tracking-wider text-zinc-400 block mb-0.5">Width</label>
+                  <label className="mb-0.5 block text-[11px] text-zinc-400">Width</label>
                   <input
                     type="number"
                     value={customW}
@@ -353,7 +354,7 @@ export function DeviceFrame({
                 </div>
                 <span className="text-zinc-500 mt-3.5">×</span>
                 <div>
-                  <label className="text-[9.5px] uppercase tracking-wider text-zinc-400 block mb-0.5">Height</label>
+                  <label className="mb-0.5 block text-[11px] text-zinc-400">Height</label>
                   <input
                     type="number"
                     value={customH}
@@ -365,7 +366,7 @@ export function DeviceFrame({
                 </div>
                 <button
                   type="submit"
-                  className="mt-3.5 flex items-center justify-center rounded-full bg-white p-1.5 text-black hover:bg-zinc-200 active:scale-[0.98] transition-all duration-150 font-semibold shadow-sm"
+                  className="mt-3.5 flex items-center justify-center rounded-full bg-white p-1.5 text-black hover:bg-zinc-200 transition duration-150 font-semibold shadow-sm"
                   title="Apply dimensions"
                 >
                   <Check className="h-3.5 w-3.5" />
@@ -377,7 +378,7 @@ export function DeviceFrame({
 
         {/* Viewport Display Area (Exact CSS Pixel Width & Height) */}
         <div
-          className="relative bg-black overflow-hidden flex-1"
+          className="relative shrink-0 overflow-hidden bg-black"
           style={{
             width: `${device.width}px`,
             height: `${device.height}px`,
@@ -452,7 +453,7 @@ export function DeviceFrame({
                   <Layers className="h-8 w-8 mb-2 opacity-40 text-zinc-500 animate-pulse" />
                   <p className="text-xs font-medium text-zinc-300">
                     {isSnapshotLoading
-                      ? "Rendering high-fidelity preview..."
+                      ? "Rendering snapshot…"
                       : url
                       ? "Snapshot not available"
                       : "Enter a website URL above to generate a snapshot"}

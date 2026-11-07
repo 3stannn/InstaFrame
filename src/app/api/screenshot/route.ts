@@ -13,6 +13,7 @@ import {
   FailureClassification,
   BrowserBackend,
 } from "@/lib/capture-logger";
+import { acquireSharedBrowser, releaseSharedBrowser, type LaunchedBrowser } from "@/lib/browser-pool";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,6 +52,57 @@ function getLocalChromePath(): string | null {
     if (fs.existsSync(p)) return p;
   }
   return null;
+}
+
+const LOCAL_CHROME_ARGS = [
+  "--no-sandbox",
+  "--disable-setuid-sandbox",
+  "--disable-gpu",
+  "--disable-dev-shm-usage",
+  "--disable-background-networking",
+  "--disable-background-timer-throttling",
+  "--disable-backgrounding-occluded-windows",
+  "--disable-breakpad",
+  "--disable-client-side-phishing-detection",
+  "--disable-default-apps",
+  "--disable-extensions",
+  "--disable-hang-monitor",
+  "--disable-popup-blocking",
+  "--disable-prompt-on-repost",
+  "--disable-sync",
+  "--metrics-recording-only",
+  "--no-first-run",
+  "--safebrowsing-disable-auto-update",
+];
+
+async function launchLocalChrome(executablePath: string): Promise<LaunchedBrowser> {
+  const userDataDir = path.join(os.tmpdir(), `instaframe_prof_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);
+  try {
+    const browser = await puppeteer.launch({
+      executablePath,
+      headless: true,
+      userDataDir,
+      defaultViewport: null,
+      args: LOCAL_CHROME_ARGS,
+    });
+    return { browser, userDataDir };
+  } catch (err) {
+    fs.promises.rm(userDataDir, { recursive: true, force: true }).catch(() => {});
+    throw err;
+  }
+}
+
+async function launchServerlessChromium(): Promise<LaunchedBrowser> {
+  const chromium = (await import("@sparticuz/chromium")).default;
+  const executablePath = await chromium.executablePath();
+  if (!executablePath) throw new Error("Chromium executable path is empty");
+  const browser = await puppeteer.launch({
+    executablePath,
+    headless: "shell",
+    defaultViewport: null,
+    args: chromium.args,
+  });
+  return { browser, userDataDir: null };
 }
 
 /**
@@ -97,7 +149,7 @@ export async function POST(request: NextRequest) {
   let context: BrowserContext | null = null;
   let page: Page | null = null;
   let isRemote = false;
-  let tempUserDataDir: string | null = null;
+  let usesSharedBrowser = false;
   let inFlightLaunch: Promise<Browser> | null = null;
 
   try {
@@ -203,6 +255,17 @@ export async function POST(request: NextRequest) {
       const frameKey = aliases[String(frameId)] || String(frameId);
       const meta = FRAME_METAS[frameKey as keyof typeof FRAME_METAS];
       if (meta) emulatedHeight = getFrameContentHeight(meta, deviceWidth);
+
+      // Viewport captures have a known size: reject oversized ones before starting a browser.
+      const viewportPixels = deviceWidth * emulatedHeight * deviceScaleFactor * deviceScaleFactor;
+      if (viewportPixels > MAX_TOTAL_PIXELS) {
+        logger.endStage("validation");
+        logger.fail("OVERSIZED_CAPTURE", `Viewport capture too large (${deviceWidth} × ${emulatedHeight} px)`, 400);
+        return NextResponse.json(
+          { error: `Capture exceeds maximum allowable dimensions (${deviceWidth} × ${emulatedHeight} px). Please reduce dimensions.` },
+          { status: 400 }
+        );
+      }
     }
 
     logger.endStage("validation");
@@ -277,44 +340,16 @@ export async function POST(request: NextRequest) {
       }
     } else if (backendType === "local-chrome") {
       const localPath = getLocalChromePath()!;
-      const uniqueProfileId = `instaframe_prof_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      tempUserDataDir = path.join(os.tmpdir(), uniqueProfileId);
-
+      const acquiring = acquireSharedBrowser(`local:${localPath}`, () => launchLocalChrome(localPath));
       try {
-        inFlightLaunch = puppeteer.launch({
-          executablePath: localPath,
-          headless: true,
-          userDataDir: tempUserDataDir,
-          args: [
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-gpu",
-            "--disable-dev-shm-usage",
-            "--disable-background-networking",
-            "--disable-background-timer-throttling",
-            "--disable-backgrounding-occluded-windows",
-            "--disable-breakpad",
-            "--disable-client-side-phishing-detection",
-            "--disable-default-apps",
-            "--disable-extensions",
-            "--disable-hang-monitor",
-            "--disable-popup-blocking",
-            "--disable-prompt-on-repost",
-            "--disable-sync",
-            "--metrics-recording-only",
-            "--no-first-run",
-            "--safebrowsing-disable-auto-update",
-            `--window-size=${deviceWidth},${emulatedHeight}`,
-          ],
-        });
         browser = await withTimeout(
-          () => inFlightLaunch!,
+          () => acquiring,
           launchBudget,
           "Local browser launch timed out"
         );
-        inFlightLaunch = null;
+        usesSharedBrowser = true;
       } catch (launchErr: unknown) {
-        inFlightLaunch = null;
+        acquiring.then(releaseSharedBrowser).catch(() => {});
         logger.endStage("launch_connect");
         logger.fail("BROWSER_UNAVAILABLE", launchErr, 500);
         return NextResponse.json(
@@ -324,32 +359,16 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Serverless environment (@sparticuz/chromium) without on-demand download fallback
+      const acquiring = acquireSharedBrowser("sparticuz", launchServerlessChromium);
       try {
-        const chromium = (await import("@sparticuz/chromium")).default;
-        const executablePath = await chromium.executablePath();
-
-        if (!executablePath) {
-          throw new Error("Chromium executable path is empty");
-        }
-
-        inFlightLaunch = puppeteer.launch({
-          executablePath,
-          headless: "shell",
-          defaultViewport: {
-            width: deviceWidth,
-            height: emulatedHeight,
-            deviceScaleFactor,
-          },
-          args: chromium.args,
-        });
         browser = await withTimeout(
-          () => inFlightLaunch!,
+          () => acquiring,
           launchBudget,
           "Serverless Chromium launch timed out"
         );
-        inFlightLaunch = null;
+        usesSharedBrowser = true;
       } catch (serverlessErr: unknown) {
-        inFlightLaunch = null;
+        acquiring.then(releaseSharedBrowser).catch(() => {});
         const errMsg =
           serverlessErr instanceof Error ? serverlessErr.message : String(serverlessErr);
         logger.endStage("launch_connect");
@@ -363,19 +382,15 @@ export async function POST(request: NextRequest) {
         );
       }
     }
-
     logger.endStage("launch_connect");
 
     // 4. Context and Page Setup Stage
     logger.startStage("context_page_setup");
 
-    if (isRemote) {
-      // Isolated context for shared remote browser sessions
-      context = await browser.createBrowserContext();
-      page = await context.newPage();
-    } else {
-      page = await browser.newPage();
-    }
+    // Every capture gets its own isolated context (cookies, storage, cache),
+    // both on shared remote browsers and on the warm local browser.
+    context = await browser.createBrowserContext();
+    page = await context.newPage();
 
     await page.setViewport({
       width: deviceWidth,
@@ -739,6 +754,8 @@ export async function POST(request: NextRequest) {
       if (browser) {
         if (isRemote) {
           await browser.disconnect().catch(() => {});
+        } else if (usesSharedBrowser) {
+          releaseSharedBrowser(browser);
         } else {
           await browser.close().catch(() => {});
         }
@@ -751,10 +768,6 @@ export async function POST(request: NextRequest) {
             else b.close().catch(() => {});
           }).catch(() => {});
         }
-      }
-
-      if (tempUserDataDir) {
-        fs.promises.rm(tempUserDataDir, { recursive: true, force: true }).catch(() => {});
       }
     } catch {
       // Suppress cleanup errors

@@ -49,7 +49,7 @@ function ToastItem({
 
   return (
     <div
-      className="pointer-events-auto flex items-center gap-2.5 rounded-xl border border-white/10 bg-[#0a0a0c]/98 px-3.5 py-2.5 text-xs text-white shadow-2xl shadow-black/80 backdrop-blur-xl transition-all duration-150 animate-in fade-in slide-in-from-bottom-2"
+      className="pointer-events-auto flex items-center gap-2.5 rounded-xl border border-white/10 bg-[#0a0a0c]/[0.98] px-3.5 py-2.5 text-xs text-white shadow-2xl shadow-black/80 backdrop-blur-xl transition duration-150 animate-in fade-in slide-in-from-bottom-2"
     >
       {icons[toast.type]}
       <span className="font-medium tracking-tight">{toast.message}</span>

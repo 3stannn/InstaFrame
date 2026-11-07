@@ -309,7 +309,7 @@ export function ViewportSelectionOverlay({
 
             {/* Floating Action Toolbar */}
             <div
-              className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-950/95 p-1 shadow-lg backdrop-blur-md transition-all ${
+              className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-950/95 p-1 shadow-lg backdrop-blur-md transition ${
                 rect.y + rect.height + 50 > deviceHeight
                   ? "bottom-3"
                   : "top-full mt-3"

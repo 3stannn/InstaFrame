@@ -19,7 +19,7 @@ const rawPresets: Record<string, DevicePreset> = {
   // Illustrative Viewport Presets & Desktop
   "desktop-1440": {
     id: "desktop-1440",
-    name: "Desktop Viewport (1440 × 900)",
+    name: "Desktop viewport",
     category: "Desktop & Laptops",
     width: 1440,
     height: 900,
@@ -31,7 +31,7 @@ const rawPresets: Record<string, DevicePreset> = {
   },
   "desktop-1280": {
     id: "desktop-1280",
-    name: "Laptop Viewport (1280 × 800)",
+    name: "Laptop viewport",
     category: "Desktop & Laptops",
     width: 1280,
     height: 800,
@@ -43,7 +43,7 @@ const rawPresets: Record<string, DevicePreset> = {
   },
   "tablet-768": {
     id: "tablet-768",
-    name: "Tablet Viewport (768 × 1024)",
+    name: "Tablet viewport",
     category: "Tablets",
     width: 768,
     height: 1024,
@@ -56,7 +56,7 @@ const rawPresets: Record<string, DevicePreset> = {
   },
   "mobile-390": {
     id: "mobile-390",
-    name: "Mobile Viewport (390 × 844)",
+    name: "Mobile viewport",
     category: "Mobile Devices",
     width: 390,
     height: 844,
@@ -146,7 +146,7 @@ const rawPresets: Record<string, DevicePreset> = {
   },
   "laptop-1366": {
     id: "laptop-1366",
-    name: "Standard Laptop",
+    name: "Standard laptop",
     category: "Desktop & Laptops",
     width: 1366,
     height: 768,
@@ -307,37 +307,47 @@ export const DEVICE_PRESETS: Record<string, DevicePreset> = new Proxy(rawPresets
 
 export const DEVICE_CATEGORIES = ["Desktop & Laptops", "Tablets", "Mobile Devices"] as const;
 
+/** Sentence-case labels shown in menus. */
+export const CATEGORY_LABELS: Record<(typeof DEVICE_CATEGORIES)[number], string> = {
+  "Desktop & Laptops": "Desktops and laptops",
+  Tablets: "Tablets",
+  "Mobile Devices": "Phones",
+};
+
+// Single-item groups have no section header.
 export const FRAME_OPTIONS = [
-  { id: "none", name: "Raw", meta: "Default", section: "Default", icon: "raw" as const },
-  { id: "pro-display-xdr", name: "Pro Display XDR", meta: "", section: "Displays", icon: "monitor" as const },
-  { id: "macbook-air-13", name: 'MacBook Air 13"', meta: "", section: "Laptops", icon: "laptop" as const },
-  { id: "ipad-pro", name: "iPad Pro", meta: "", section: "Tablets", icon: "tablet" as const },
+  { id: "none", name: "No frame", meta: "", section: "", icon: "raw" as const },
+  { id: "pro-display-xdr", name: "Pro Display XDR", meta: "", section: "", icon: "monitor" as const },
+  { id: "macbook-air-13", name: 'MacBook Air 13"', meta: "", section: "", icon: "laptop" as const },
+  { id: "ipad-pro", name: "iPad Pro", meta: "", section: "", icon: "tablet" as const },
   { id: "iphone-15", name: "iPhone 15", meta: "", section: "Phones", icon: "phone" as const },
   { id: "s24", name: "Galaxy S24 Ultra", meta: "", section: "Phones", icon: "phone" as const },
   { id: "pixel-8", name: "Pixel 8", meta: "", section: "Phones", icon: "phone" as const }
 ] as const;
 
+const CHECKERBOARD = "repeating-conic-gradient(#a1a1aa 0% 25%, #3f3f46 0% 50%) 50% / 6px 6px";
+
 export const BACKDROP_OPTIONS = [
   {
     id: "studio-dark",
-    name: "Studio Dark",
-    section: "Studio Backdrops",
+    name: "Studio dark",
+    section: "Studio",
     swatchClass: "ring-zinc-600",
     swatchStyle: { background: "linear-gradient(135deg, #3f3f46, #18181b)" },
   },
   {
     id: "studio-light",
-    name: "Studio Light",
-    section: "Studio Backdrops",
+    name: "Studio light",
+    section: "Studio",
     swatchClass: "ring-zinc-400",
     swatchStyle: { background: "linear-gradient(135deg, #ffffff, #d4d4d8)" },
   },
   {
     id: "transparent",
     name: "Transparent",
-    section: "Minimal",
+    section: "Studio",
     swatchClass: "ring-zinc-600",
-    swatchStyle: { background: "transparent" },
+    swatchStyle: { background: CHECKERBOARD },
   },
   {
     id: "gradient-purple",
@@ -363,9 +373,9 @@ export const BACKDROP_OPTIONS = [
 ] as const;
 
 export const ZOOM_OPTIONS = [
-  { value: "100", label: "100%", meta: "Default", section: "Zoom Levels" },
-  { value: "110", label: "110%", meta: "Subtle", section: "Zoom Levels" },
-  { value: "125", label: "125%", meta: "Comfortable", section: "Zoom Levels" },
-  { value: "140", label: "140%", meta: "Large", section: "Zoom Levels" },
-  { value: "150", label: "150%", meta: "Focus", section: "Zoom Levels" }
+  { value: "100", label: "100%", meta: "", section: "" },
+  { value: "110", label: "110%", meta: "", section: "" },
+  { value: "125", label: "125%", meta: "", section: "" },
+  { value: "140", label: "140%", meta: "", section: "" },
+  { value: "150", label: "150%", meta: "", section: "" }
 ] as const;

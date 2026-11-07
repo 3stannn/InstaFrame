@@ -131,7 +131,7 @@ export function LiveWebsitePreview({ url, width, height, zoom = 1, pageZoom = 10
         <button
           type="button"
           onClick={() => { setEntryUrl(currentUrl); setDirect((value) => !value); setLoading(true); }}
-          className="shrink-0 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 px-3 py-1 text-white active:scale-[0.98] transition-all duration-150 font-medium"
+          className="shrink-0 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 px-3 py-1 text-white active:scale-[0.98] transition duration-150 font-medium"
           title="Try direct loading if this website does not work in the interactive preview"
         >
           {direct ? "Direct" : "Interactive"}

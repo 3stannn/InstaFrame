@@ -1,25 +1,18 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import Image from "next/image";
 import {
-  RotateCcw,
   RefreshCw,
   X,
   Plus,
   Globe,
-  ChevronDown,
-  Camera,
   Monitor,
   Laptop,
   Tablet,
   Smartphone,
-  Layers,
-  ArrowLeft,
-  Columns,
-  Rows3,
 } from "lucide-react";
-import { DEVICE_PRESETS, DEVICE_CATEGORIES } from "@/lib/devices";
+import { DEVICE_PRESETS, DEVICE_CATEGORIES, CATEGORY_LABELS } from "@/lib/devices";
+import { computeFitScale } from "@/lib/studio-layout";
 import { CaptureOutputOption } from "./CaptureViewportPopover";
 import { cropViewportImage, downloadPng } from "@/lib/viewport-capture";
 import { DeviceFrame, DeviceFrameDevice } from "./preview/DeviceFrame";
@@ -38,6 +31,26 @@ interface DeviceSnapshot {
   viewportHeight: number;
   reloadKey: number;
 }
+
+function snapshotKey(device: DeviceFrameDevice, url: string) {
+  return `${url}|${device.width}x${device.height}|${device.reloadKey}`;
+}
+
+function isSnapshotCurrent(snapshot: DeviceSnapshot | undefined | null, device: DeviceFrameDevice, url: string) {
+  return Boolean(
+    snapshot?.dataUrl &&
+      snapshot.targetUrl === url &&
+      snapshot.viewportWidth === device.width &&
+      snapshot.viewportHeight === device.height &&
+      snapshot.reloadKey === device.reloadKey
+  );
+}
+
+function persistedDevices(devices: DeviceFrameDevice[]) {
+  return devices.map(({ id, presetKey, name, width, height, rotated }) => ({ id, presetKey, name, width, height, rotated }));
+}
+
+const SNAPSHOT_CONCURRENCY = 2;
 
 import { executeScreenshotCapture } from "@/lib/capture-client";
 
@@ -73,7 +86,6 @@ export function ResponsiveStudio({
   const [scrollMode, setScrollMode] = useState<"ratio" | "pixels">("ratio");
   const [currentScale, setCurrentScale] = useState<"auto" | number>("auto");
   const [computedScale, setComputedScale] = useState(1);
-  const [layoutMode, setLayoutMode] = useState<"wrap" | "row">("row");
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [bridgeHelpOpen, setBridgeHelpOpen] = useState(false);
 
@@ -126,6 +138,7 @@ export function ResponsiveStudio({
   const bridgeControllerRef = useRef<PreviewBridgeController | null>(null);
   const snapshotBatchRef = useRef(0);
   const snapshotControllersRef = useRef(new Map<string, AbortController>());
+  const snapshotKeysRef = useRef(new Map<string, string>());
   const embedControllerRef = useRef<AbortController | null>(null);
   const scrollPositionsRef = useRef(new Map<string, { x: number; y: number }>());
   const settingsReadyRef = useRef(false);
@@ -137,7 +150,6 @@ export function ResponsiveStudio({
     const saved = loadSettings();
     settingsReadyRef.current = true;
     if (saved.responsive) {
-      if (saved.responsive.layoutMode) setLayoutMode(saved.responsive.layoutMode);
       if (saved.responsive.syncScroll !== undefined) setSyncScroll(saved.responsive.syncScroll);
       if (saved.responsive.scrollMode) setScrollMode(saved.responsive.scrollMode);
       if (saved.responsive.scale) setCurrentScale(saved.responsive.scale);
@@ -199,19 +211,32 @@ export function ResponsiveStudio({
 
   useEffect(() => {
     if (settingsReadyRef.current) {
-      saveSettings({ responsive: {
-        activeDevices: activeDevices.map(({ id, presetKey, name, width, height, rotated }) => ({ id, presetKey, name, width, height, rotated })),
-      } });
+      saveSettings({ responsive: { activeDevices: persistedDevices(activeDevices) } });
     }
+    // Cancel only the captures this change made stale; others keep running.
+    const stale: string[] = [];
     for (const [id, controller] of snapshotControllersRef.current) {
+      const device = activeDevices.find((item) => item.id === id);
+      if (device && snapshotKeysRef.current.get(id) === snapshotKey(device, activeUrl)) continue;
       controller.abort();
       snapshotControllersRef.current.delete(id);
+      snapshotKeysRef.current.delete(id);
+      stale.push(id);
     }
-    setSnapshotLoading({});
-    setSnapshots((previous) => Object.fromEntries(Object.entries(previous).filter(([id, snap]) => {
-      const device = activeDevices.find((item) => item.id === id);
-      return device && snap.targetUrl === activeUrl && snap.viewportWidth === device.width && snap.viewportHeight === device.height && snap.reloadKey === device.reloadKey;
-    })));
+    if (stale.length) {
+      setSnapshotLoading((prev) => {
+        const next = { ...prev };
+        stale.forEach((id) => delete next[id]);
+        return next;
+      });
+    }
+    setSnapshots((previous) => {
+      const kept = Object.entries(previous).filter(([id, snap]) => {
+        const device = activeDevices.find((item) => item.id === id);
+        return device && isSnapshotCurrent(snap, device, activeUrl);
+      });
+      return kept.length === Object.keys(previous).length ? previous : Object.fromEntries(kept);
+    });
   }, [activeUrl, activeDevices]);
 
   useEffect(() => {
@@ -278,6 +303,7 @@ export function ResponsiveStudio({
       snapshotControllersRef.current.get(device.id)?.abort();
       const controller = new AbortController();
       snapshotControllersRef.current.set(device.id, controller);
+      snapshotKeysRef.current.set(device.id, snapshotKey(device, target));
       setSnapshotLoading((prev) => ({ ...prev, [device.id]: true }));
       try {
         const result = await executeScreenshotCapture({
@@ -322,6 +348,7 @@ export function ResponsiveStudio({
       } finally {
         if (snapshotControllersRef.current.get(device.id) === controller) {
           snapshotControllersRef.current.delete(device.id);
+          snapshotKeysRef.current.delete(device.id);
           setSnapshotLoading((prev) => ({ ...prev, [device.id]: false }));
         }
       }
@@ -329,22 +356,35 @@ export function ResponsiveStudio({
     [onShowToast]
   );
 
-  // Capture snapshots for all active devices sequentially to avoid overwhelming browser
-  const captureAllSnapshots = useCallback(
-    async (target: string, devicesToCapture = activeDevices) => {
+  const snapshotsRef = useRef(snapshots);
+  snapshotsRef.current = snapshots;
+
+  // Capture only viewports without a current snapshot, a few at a time.
+  // Unchanged viewports reuse their snapshot; reloaded ones bypass the cache.
+  const captureMissingSnapshots = useCallback(
+    async (target: string, devices: DeviceFrameDevice[]) => {
       if (!target) return;
       const batch = ++snapshotBatchRef.current;
-      for (const device of devicesToCapture) {
-        if (batch !== snapshotBatchRef.current || target !== activeUrlRef.current) break;
-        await captureDeviceSnapshot(device, target, true);
-      }
+      const queue = devices.filter(
+        (device) =>
+          !isSnapshotCurrent(snapshotsRef.current[device.id], device, target) &&
+          !snapshotControllersRef.current.has(device.id)
+      );
+      const worker = async () => {
+        while (queue.length) {
+          if (batch !== snapshotBatchRef.current || target !== activeUrlRef.current) return;
+          const device = queue.shift()!;
+          await captureDeviceSnapshot(device, target, device.reloadKey > 1);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(SNAPSHOT_CONCURRENCY, queue.length) }, worker));
     },
-    [activeDevices, captureDeviceSnapshot]
+    [captureDeviceSnapshot]
   );
 
   useEffect(() => {
-    if (previewMode === "preview" && activeUrl) captureAllSnapshots(activeUrl);
-  }, [previewMode, activeUrl, activeDevices, captureAllSnapshots]);
+    if (previewMode === "preview" && activeUrl) captureMissingSnapshots(activeUrl, activeDevices);
+  }, [previewMode, activeUrl, activeDevices, captureMissingSnapshots]);
 
   // On activeUrl change
   useEffect(() => {
@@ -400,7 +440,7 @@ export function ResponsiveStudio({
     const preset = DEVICE_PRESETS[presetKey];
     if (!preset) return;
     const newDevice: DeviceFrameDevice = {
-      id: `dev-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      id: `dev-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       presetKey,
       name: preset.name,
       width: preset.width,
@@ -408,58 +448,16 @@ export function ResponsiveStudio({
       rotated: false,
       reloadKey: 1,
     };
-    setActiveDevices((prev) => {
-      const updated = [...prev, newDevice];
-      saveSettings({
-        responsive: {
-          activeDevices: updated.map(({ id, presetKey, name, width, height, rotated }) => ({
-            id,
-            presetKey,
-            name,
-            width,
-            height,
-            rotated,
-          })),
-        },
-      });
-      return updated;
-    });
+    // Settings are persisted by the activeDevices effect.
+    setActiveDevices((prev) => [...prev, newDevice]);
     setAddMenuOpen(false);
-    if (currentScale === "auto" && canvasRef.current) {
-      canvasRef.current.scrollLeft = 0;
-    }
   };
 
-  // Remove device viewport
+  // Remove device viewport (the last one stays; its close button is disabled)
   const handleRemoveDevice = (id: string) => {
-    if (activeDevices.length <= 1) {
-      onShowToast("At least one viewport must remain visible.", "error");
-      return;
-    }
-
-    if (bridgeControllerRef.current) {
-      bridgeControllerRef.current.unregisterFrame(id);
-    }
-
-    setActiveDevices((prev) => {
-      const updated = prev.filter((d) => d.id !== id);
-      saveSettings({
-        responsive: {
-          activeDevices: updated.map(({ id, presetKey, name, width, height, rotated }) => ({
-            id,
-            presetKey,
-            name,
-            width,
-            height,
-            rotated,
-          })),
-        },
-      });
-      return updated;
-    });
-    if (currentScale === "auto" && canvasRef.current) {
-      canvasRef.current.scrollLeft = 0;
-    }
+    if (activeDevices.length <= 1) return;
+    bridgeControllerRef.current?.unregisterFrame(id);
+    setActiveDevices((prev) => (prev.length <= 1 ? prev : prev.filter((d) => d.id !== id)));
   };
 
   // Rotate device viewport (swaps width and height without remounting iframe)
@@ -507,52 +505,27 @@ export function ResponsiveStudio({
   };
 
   // Dynamic Fit Scale Calculation
+  // Fit: the largest scale at which all wrapped rows fit on screen (min 25%, then scroll).
   const recalculateScale = useCallback(() => {
-    if (!canvasRef.current) return;
-    const canvasW = canvasRef.current.clientWidth - 48;
-    const canvasH = canvasRef.current.clientHeight - 48;
-
-    if (canvasW <= 0 || canvasH <= 0 || activeDevices.length === 0) return;
-
-    if (currentScale === "auto") {
-      if (layoutMode === "row") {
-        // In single-row mode:
-        // Subtract all inter-device gaps (32px each) from available canvas width
-        // before dividing by total unscaled device widths, so rendered footprint + gaps <= canvasW
-        const totalDeviceWidth = activeDevices.reduce((sum, d) => sum + d.width + 2, 0);
-        const totalGaps = Math.max(0, activeDevices.length - 1) * 32;
-        const availableW = Math.max(80, canvasW - totalGaps);
-        const maxHeight = activeDevices.reduce((max, d) => Math.max(max, d.height + 38), 0);
-
-        const scaleX = availableW / totalDeviceWidth;
-        const scaleY = canvasH / maxHeight;
-        // Clamp fit scale so it fits both width and height cleanly without overflow
-        const fit = Math.min(1.0, Math.max(0.12, Math.min(scaleX, scaleY)));
-        setComputedScale(fit);
-      } else {
-        // Keep the stored "wrap" preference compatible with the vertical stack.
-        // Fit each viewport independently; the canvas scrolls down the list.
-        const maxHeight = activeDevices.reduce((max, d) => Math.max(max, d.height + 38), 0);
-        const maxWidth = activeDevices.reduce((max, d) => Math.max(max, d.width + 2), 0);
-        const fit = Math.min(1, Math.max(0.12, Math.min(canvasW / maxWidth, canvasH / maxHeight)));
-        setComputedScale(fit);
-      }
-
-      // Ensure canvas scroll is reset to origin so the first device is never cut off
-      if (canvasRef.current) {
-        canvasRef.current.scrollLeft = 0;
-      }
-    } else {
+    if (currentScale !== "auto") {
       setComputedScale(currentScale);
+      return;
     }
-  }, [activeDevices, currentScale, layoutMode]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const canvasW = canvas.clientWidth - 48; // p-6 on both sides
+    const canvasH = canvas.clientHeight - 48;
+    if (canvasW <= 0 || canvasH <= 0 || activeDevices.length === 0) return;
+    setComputedScale(computeFitScale(activeDevices, canvasW, canvasH));
+  }, [activeDevices, currentScale]);
 
   useEffect(() => {
     recalculateScale();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
     const observer = new ResizeObserver(recalculateScale);
-    if (canvasRef.current) observer.observe(canvasRef.current);
-    window.addEventListener("resize", recalculateScale);
-    return () => { observer.disconnect(); window.removeEventListener("resize", recalculateScale); };
+    observer.observe(canvas);
+    return () => observer.disconnect();
   }, [recalculateScale]);
 
   // Handle visible capture
@@ -684,307 +657,207 @@ export function ResponsiveStudio({
 
   const viewerOrigin = typeof window !== "undefined" ? window.location.origin : "";
 
+  const segmentButton = (active: boolean) =>
+    `h-[26px] rounded-full px-3 text-xs transition-colors duration-150 ${
+      active ? "bg-white/[0.12] font-medium text-white" : "text-zinc-400 hover:bg-white/5 hover:text-white"
+    }`;
+
+  const zoomSteps: { label: string; value: "auto" | number }[] = [
+    { label: "Fit", value: "auto" },
+    { label: "100%", value: 1 },
+    { label: "75%", value: 0.75 },
+    { label: "50%", value: 0.5 },
+  ];
+
   return (
     <div className="flex min-h-0 h-full flex-col bg-black text-zinc-100">
-      {/* Studio Toolbar Header */}
-      <div className="relative z-30 shrink-0 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#0a0a0c]/95 backdrop-blur-md px-4 py-2.5">
-        {/* Left Side: URL Form */}
-        <div className="flex items-center gap-2.5 flex-1 min-w-0">
-          {/* URL Input Form */}
-          <form onSubmit={handleNavigate} className="flex items-center gap-2 flex-1 max-w-xl min-w-0">
-            <div className="relative flex-1 min-w-0">
-              <Globe className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
-              <input
-                type="text"
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-                placeholder="https://yourwebsite.com"
-                className="w-full rounded-full border border-white/10 bg-black py-1.5 pl-8 pr-8 text-xs font-normal text-white placeholder-zinc-500 transition-all duration-150 focus:border-white/30 focus:bg-[#0a0a0c] focus:outline-none focus:ring-1 focus:ring-white/20"
-              />
-              {urlInput && (
-                <button
-                  type="button"
-                  onClick={() => setUrlInput("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-zinc-500 hover:text-white transition-colors duration-150"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-
-            {/* Add Viewport Dropdown - Positioned next to input */}
-            <div ref={addMenuRef} className="relative shrink-0">
+      {/* Studio toolbar */}
+      <div className="relative z-30 shrink-0 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-white/10 bg-[#0a0a0c]/95 backdrop-blur-md px-4 py-2.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          {/* URL bar: one 32px pill, reload and Go inside as 26px buttons */}
+          <form
+            onSubmit={handleNavigate}
+            className="flex h-8 min-w-0 max-w-xl flex-1 items-center rounded-full border border-white/10 bg-black pl-3 pr-[2px] transition-colors duration-150 focus-within:border-white/30"
+          >
+            <Globe aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+            <input
+              type="text"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              placeholder="https://yourwebsite.com"
+              aria-label="Website URL"
+              className="min-w-0 flex-1 bg-transparent px-2 text-xs text-white placeholder-zinc-500 outline-none"
+            />
+            {urlInput && (
               <button
                 type="button"
-                onClick={() => setAddMenuOpen((prev) => !prev)}
-                className="flex items-center gap-1.5 rounded-full border border-white/10 bg-[#0a0a0c] px-3.5 py-1.5 text-xs font-medium text-zinc-300 hover:border-white/20 hover:bg-[#141417] hover:text-white active:scale-[0.98] transition-all duration-150"
+                onClick={() => setUrlInput("")}
+                aria-label="Clear URL"
+                className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-zinc-500 transition-colors duration-150 hover:text-white"
               >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Add Viewport</span>
+                <X className="h-3 w-3" />
               </button>
-
-              {addMenuOpen && (
-                <div className="absolute left-0 top-full z-50 mt-1.5 max-h-[380px] w-72 overflow-y-auto rounded-xl border border-white/10 bg-[#0a0a0c]/98 backdrop-blur-xl p-1.5 shadow-2xl">
-                  {DEVICE_CATEGORIES.map((category, catIdx) => {
-                    const items = Object.entries(DEVICE_PRESETS).filter(
-                      ([_, preset]) => preset.category === category
-                    );
-                    if (items.length === 0) return null;
-                    return (
-                      <div
-                        key={category}
-                        className={catIdx > 0 ? "mt-1 border-t border-white/5 pt-1.5" : ""}
-                      >
-                        <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                          {category}
-                        </div>
-                        <div className="space-y-0.5">
-                          {items.map(([key, preset]) => {
-                            const IconComp =
-                              category === "Desktop & Laptops"
-                                ? preset.name.includes("Book") || preset.name.includes("Laptop")
-                                  ? Laptop
-                                  : Monitor
-                                : category === "Tablets"
-                                ? Tablet
-                                : Smartphone;
-
-                            return (
-                              <button
-                                key={key}
-                                type="button"
-                                onClick={() => handleAddDevice(key)}
-                                className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 transition-colors duration-120 hover:bg-[#141417] hover:text-white active:scale-[0.98]"
-                              >
-                                <div className="flex items-center gap-2 overflow-hidden">
-                                  <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-white/5 border border-white/5 text-zinc-400">
-                                    <IconComp className="h-3 w-3" />
-                                  </span>
-                                  <span className="truncate">{preset.name}</span>
-                                </div>
-                                <span className="ml-2 flex-shrink-0 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[9.5px] tabular-nums text-zinc-400">
-                                  {preset.width} × {preset.height}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              className="flex items-center rounded-full bg-white px-4 py-1.5 text-xs font-semibold text-black transition-all duration-150 hover:bg-zinc-200 active:scale-[0.98] shadow-sm shrink-0"
-            >
-              <span>Go</span>
-            </button>
+            )}
             <button
               type="button"
               onClick={handleReloadAll}
               title="Reload all viewports"
-              className="flex items-center justify-center rounded-full border border-white/10 bg-[#0a0a0c] p-2 text-zinc-400 transition-all duration-150 hover:border-white/20 hover:bg-[#141417] hover:text-white active:scale-[0.98] shrink-0"
+              aria-label="Reload all viewports"
+              className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors duration-150 hover:bg-white/10 hover:text-white"
             >
               <RefreshCw className="h-3.5 w-3.5" />
             </button>
+            <button
+              type="submit"
+              className="ml-[2px] h-[26px] shrink-0 rounded-full bg-white/[0.12] px-3.5 text-xs font-medium text-white transition-colors duration-150 hover:bg-white/20"
+            >
+              Go
+            </button>
           </form>
+
+          {/* Add viewport: the only white button */}
+          <div ref={addMenuRef} className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setAddMenuOpen((prev) => !prev)}
+              aria-haspopup="menu"
+              aria-expanded={addMenuOpen}
+              className="flex h-8 items-center gap-1.5 rounded-full bg-white px-3.5 text-xs font-semibold text-black transition-colors duration-150 hover:bg-zinc-200"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add viewport</span>
+            </button>
+
+            {addMenuOpen && (
+              <div
+                role="menu"
+                className="absolute left-0 top-full z-50 mt-1.5 max-h-[380px] w-72 overflow-y-auto rounded-xl border border-white/10 bg-[#0a0a0c]/[0.98] p-1.5 shadow-2xl backdrop-blur-xl"
+              >
+                {DEVICE_CATEGORIES.map((category, catIdx) => {
+                  const items = Object.entries(DEVICE_PRESETS).filter(([, preset]) => preset.category === category);
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={category} className={catIdx > 0 ? "mt-1 border-t border-white/5 pt-1.5" : ""}>
+                      <div className="px-2.5 py-1 text-[11px] font-medium text-zinc-500">
+                        {CATEGORY_LABELS[category]}
+                      </div>
+                      <div className="space-y-0.5">
+                        {items.map(([key, preset]) => {
+                          const IconComp =
+                            category === "Desktop & Laptops"
+                              ? /book|laptop/i.test(preset.name)
+                                ? Laptop
+                                : Monitor
+                              : category === "Tablets"
+                              ? Tablet
+                              : Smartphone;
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              role="menuitem"
+                              onClick={() => handleAddDevice(key)}
+                              className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 transition-colors duration-100 hover:bg-white/[0.06] hover:text-white"
+                            >
+                              <span className="flex min-w-0 items-center gap-2">
+                                <IconComp className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                                <span className="truncate">{preset.name}</span>
+                              </span>
+                              <span className="ml-2 shrink-0 text-[11px] tabular-nums text-zinc-500">
+                                {preset.width} × {preset.height}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Right Side Controls: Mode + Layout + Sync Scroll + Zoom (Segmented Pill Controls) */}
-        <div className="flex items-center gap-3 shrink-0">
-          {/* Preview Mode (Live vs Snapshot) */}
-          <div className="inline-flex items-center rounded-full border border-white/10 bg-[#0a0a0c] p-1 text-xs gap-1 shadow-inner">
-            <button
-              type="button"
-              onClick={() => setPreviewMode("live")}
-              className={`rounded-full px-3 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
-                previewMode === "live"
-                  ? "bg-white font-semibold text-black shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5"
-              }`}
-            >
+        <div className="flex shrink-0 flex-wrap items-center gap-3">
+          {/* Preview mode */}
+          <div role="group" aria-label="Preview mode" className="inline-flex h-8 items-center gap-0.5 rounded-full border border-white/10 bg-[#0a0a0c] p-[2px]">
+            <button type="button" aria-pressed={previewMode === "live"} onClick={() => setPreviewMode("live")} className={segmentButton(previewMode === "live")}>
               Live
             </button>
-            <button
-              type="button"
-              onClick={() => setPreviewMode("preview")}
-              className={`rounded-full px-3 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
-                previewMode === "preview"
-                  ? "bg-white font-semibold text-black shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5"
-              }`}
-            >
+            <button type="button" aria-pressed={previewMode === "preview"} onClick={() => setPreviewMode("preview")} className={segmentButton(previewMode === "preview")}>
               Snapshot
             </button>
           </div>
 
-          {/* Layout Mode (Row vs Stack) */}
-          <div className="inline-flex items-center rounded-full border border-white/10 bg-[#0a0a0c] p-1 text-xs gap-1 shadow-inner">
-            <button
-              type="button"
-              onClick={() => {
-                setLayoutMode("row");
-                saveSettings({ responsive: { layoutMode: "row" } });
-              }}
-              title="Row: viewports in a single horizontal row"
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
-                layoutMode === "row"
-                  ? "bg-white font-semibold text-black shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              <Columns className="h-3 w-3" />
-              <span>Row</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setLayoutMode("wrap");
-                saveSettings({ responsive: { layoutMode: "wrap" } });
-              }}
-              title="Stack: viewports in a vertical list"
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
-                layoutMode === "wrap"
-                  ? "bg-white font-semibold text-black shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              <Rows3 className="h-3 w-3" />
-              <span>Stack</span>
-            </button>
-          </div>
-
-          {/* Sync Scroll Toggle */}
-          <div className="flex items-center gap-2 select-none">
+          {/* Sync scroll */}
+          <label className="flex cursor-pointer select-none items-center gap-2">
             <button
               type="button"
               role="switch"
               aria-checked={syncScroll}
+              aria-label="Sync scroll"
               onClick={() => setSyncScroll(!syncScroll)}
-              className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-150 ease-out focus:outline-none ${
-                syncScroll
-                  ? "border-white/30 bg-white"
-                  : "border-white/15 bg-white/10 hover:border-white/25"
+              className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full border transition-colors duration-150 ease-out ${
+                syncScroll ? "border-white/30 bg-white" : "border-white/15 bg-white/10 hover:border-white/25"
               }`}
             >
               <span
                 aria-hidden="true"
                 className={`pointer-events-none inline-block h-2.5 w-2.5 rounded-full transition-transform duration-150 ease-out ${
-                  syncScroll
-                    ? "translate-x-3.5 bg-black"
-                    : "translate-x-0.5 bg-zinc-400"
+                  syncScroll ? "translate-x-3.5 bg-black" : "translate-x-0.5 bg-zinc-400"
                 }`}
               />
             </button>
-            <span className="text-xs text-zinc-300 font-medium">Sync Scroll</span>
-          </div>
+            <span className="text-xs font-medium text-zinc-300">Sync scroll</span>
+          </label>
 
-          {/* Scale Buttons (Segmented Control - Exact Match with User Inspo) */}
-          <div className="inline-flex items-center rounded-full border border-white/10 bg-[#0a0a0c] p-1 text-xs gap-1 shadow-inner">
-            <button
-              type="button"
-              onClick={() => {
-                setCurrentScale("auto");
-                recalculateScale();
-                if (canvasRef.current) {
-                  canvasRef.current.scrollLeft = 0;
-                }
-              }}
-              className={`rounded-full px-3 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
-                currentScale === "auto"
-                  ? "bg-white font-semibold text-black shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              Fit
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentScale(1)}
-              className={`rounded-full px-3 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
-                currentScale === 1
-                  ? "bg-white font-semibold text-black shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              100%
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentScale(0.75)}
-              className={`rounded-full px-3 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
-                currentScale === 0.75
-                  ? "bg-white font-semibold text-black shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              75%
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentScale(0.5)}
-              className={`rounded-full px-3 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
-                currentScale === 0.5
-                  ? "bg-white font-semibold text-black shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              50%
-            </button>
+          {/* Zoom */}
+          <div role="group" aria-label="Zoom" className="inline-flex h-8 items-center gap-0.5 rounded-full border border-white/10 bg-[#0a0a0c] p-[2px]">
+            {zoomSteps.map((step) => (
+              <button
+                key={step.label}
+                type="button"
+                aria-pressed={currentScale === step.value}
+                onClick={() => setCurrentScale(step.value)}
+                className={segmentButton(currentScale === step.value)}
+              >
+                {step.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
-      {/* Main Studio Canvas */}
-      <div
-        ref={canvasRef}
-        className="studio-canvas-bg relative flex-1 overflow-auto p-6 min-h-0 bg-black"
-      >
-        <div
-          className={`flex gap-8 items-start pb-6 ${
-            layoutMode === "wrap"
-              ? "flex-col items-center"
-              : "flex-row min-w-fit"
-          }`}
-        >
-          {activeDevices.map((device) => {
-            const snapshot = snapshots[device.id];
-            const isBridgeConnected = Boolean(bridgeConnectedDevices[device.id]);
 
-            return (
-              <DeviceFrame
-                key={device.id}
-                device={device}
-                url={activeUrl}
-                scale={computedScale}
-                previewMode={previewMode}
-                snapshotDataUrl={snapshot?.dataUrl}
-                isSnapshotLoading={Boolean(snapshotLoading[device.id])}
-                embedStatus={embedStatus}
-                isMixedContent={isMixedContent}
-                bridgeConnected={isBridgeConnected}
-                onRotate={handleRotateDevice}
-                onReload={handleReloadDevice}
-                onRemove={handleRemoveDevice}
-                onUpdateDimensions={handleUpdateDimensions}
-                onCaptureVisible={handleCaptureVisible}
-                onOpenBridgeHelp={() => setBridgeHelpOpen(true)}
-                iframeRefCallback={handleIframeRef}
-                onSnapshotScroll={(id, x, y) => scrollPositionsRef.current.set(id, { x, y })}
-              />
-            );
-          })}
+      {/* Canvas: viewports wrap into centered rows; overflow only goes right/down */}
+      <div ref={canvasRef} className="studio-canvas-bg relative min-h-0 flex-1 overflow-auto bg-black p-6">
+        <div className="studio-rows flex flex-wrap items-start gap-8">
+          {activeDevices.map((device) => (
+            <DeviceFrame
+              key={device.id}
+              device={device}
+              url={activeUrl}
+              scale={computedScale}
+              previewMode={previewMode}
+              snapshotDataUrl={snapshots[device.id]?.dataUrl}
+              isSnapshotLoading={Boolean(snapshotLoading[device.id])}
+              embedStatus={embedStatus}
+              isMixedContent={isMixedContent}
+              bridgeConnected={Boolean(bridgeConnectedDevices[device.id])}
+              canRemove={activeDevices.length > 1}
+              onRotate={handleRotateDevice}
+              onReload={handleReloadDevice}
+              onRemove={handleRemoveDevice}
+              onUpdateDimensions={handleUpdateDimensions}
+              onCaptureVisible={handleCaptureVisible}
+              onOpenBridgeHelp={() => setBridgeHelpOpen(true)}
+              iframeRefCallback={handleIframeRef}
+              onSnapshotScroll={(id, x, y) => scrollPositionsRef.current.set(id, { x, y })}
+            />
+          ))}
         </div>
       </div>
 
-      {/* Bridge Setup Documentation Modal */}
-      <BridgeHelpModal
-        isOpen={bridgeHelpOpen}
-        onClose={() => setBridgeHelpOpen(false)}
-        viewerOrigin={viewerOrigin}
-      />
+      <BridgeHelpModal isOpen={bridgeHelpOpen} onClose={() => setBridgeHelpOpen(false)} viewerOrigin={viewerOrigin} />
     </div>
   );
 }

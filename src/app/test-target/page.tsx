@@ -75,7 +75,7 @@ export default function TestTargetPage() {
         <button
           type="button"
           onClick={() => setBridgeActive((prev) => !prev)}
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+          className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
             bridgeActive
               ? "bg-emerald-600 text-white hover:bg-emerald-500"
               : "bg-indigo-600 text-white hover:bg-indigo-500"

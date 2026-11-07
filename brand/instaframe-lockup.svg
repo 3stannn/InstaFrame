@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="320" viewBox="0 0 1040 320">
+  <title>InstaFrame logo lockup</title>
+  <defs>
+    <linearGradient id="tile-fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#25262B"/>
+      <stop offset="1" stop-color="#0A0A0C"/>
+    </linearGradient>
+    <linearGradient id="tile-rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.24"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.04"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.10"/>
+    </linearGradient>
+    <linearGradient id="holo-base" x1="0.1" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.35" stop-color="#E9E4FF"/>
+      <stop offset="0.68" stop-color="#D3E6FF"/>
+      <stop offset="1" stop-color="#F6DCF4"/>
+    </linearGradient>
+    <radialGradient id="holo-violet" cx="0.5" cy="0.55" r="0.45">
+      <stop offset="0" stop-color="#A78BFA" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#A78BFA" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="holo-sky" cx="0.92" cy="0.12" r="0.6">
+      <stop offset="0" stop-color="#7FE3FF" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#7FE3FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="holo-rose" cx="0.88" cy="0.9" r="0.62">
+      <stop offset="0" stop-color="#FF8FCF" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#FF8FCF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="holo-gold" cx="0.08" cy="0.92" r="0.58">
+      <stop offset="0" stop-color="#FFE08A" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#FFE08A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="holo-gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.75"/>
+      <stop offset="0.45" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Icon: drawn at 1024 and scaled to 256px -->
+  <g id="icon" transform="translate(32 32) scale(0.25)">
+    <g id="tile">
+      <rect id="tile-background" width="1024" height="1024" rx="228" fill="url(#tile-fill)"/>
+      <rect id="tile-edge" x="2" y="2" width="1020" height="1020" rx="226" fill="none" stroke="url(#tile-rim)" stroke-width="4"/>
+    </g>
+    <g id="frame">
+      <path id="frame-base" fill="url(#holo-base)" fill-rule="evenodd" d="M382 232H642A150 150 0 0 1 792 382V642A150 150 0 0 1 642 792H382A150 150 0 0 1 232 642V382A150 150 0 0 1 382 232ZM512 280Q546 478 744 512Q546 546 512 744Q478 546 280 512Q478 478 512 280Z"/>
+      <path id="frame-tint-violet" fill="url(#holo-violet)" fill-rule="evenodd" d="M382 232H642A150 150 0 0 1 792 382V642A150 150 0 0 1 642 792H382A150 150 0 0 1 232 642V382A150 150 0 0 1 382 232ZM512 280Q546 478 744 512Q546 546 512 744Q478 546 280 512Q478 478 512 280Z"/>
+      <path id="frame-tint-sky" fill="url(#holo-sky)" fill-rule="evenodd" d="M382 232H642A150 150 0 0 1 792 382V642A150 150 0 0 1 642 792H382A150 150 0 0 1 232 642V382A150 150 0 0 1 382 232ZM512 280Q546 478 744 512Q546 546 512 744Q478 546 280 512Q478 478 512 280Z"/>
+      <path id="frame-tint-rose" fill="url(#holo-rose)" fill-rule="evenodd" d="M382 232H642A150 150 0 0 1 792 382V642A150 150 0 0 1 642 792H382A150 150 0 0 1 232 642V382A150 150 0 0 1 382 232ZM512 280Q546 478 744 512Q546 546 512 744Q478 546 280 512Q478 478 512 280Z"/>
+      <path id="frame-tint-gold" fill="url(#holo-gold)" fill-rule="evenodd" d="M382 232H642A150 150 0 0 1 792 382V642A150 150 0 0 1 642 792H382A150 150 0 0 1 232 642V382A150 150 0 0 1 382 232ZM512 280Q546 478 744 512Q546 546 512 744Q478 546 280 512Q478 478 512 280Z"/>
+      <path id="frame-gloss" fill="url(#holo-gloss)" fill-rule="evenodd" d="M382 232H642A150 150 0 0 1 792 382V642A150 150 0 0 1 642 792H382A150 150 0 0 1 232 642V382A150 150 0 0 1 382 232ZM512 280Q546 478 744 512Q546 546 512 744Q478 546 280 512Q478 478 512 280Z"/>
+      <rect id="frame-edge-highlight" x="233" y="233" width="558" height="558" rx="149" fill="none" stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="2"/>
+    </g>
+    <path id="star-edge" fill="none" stroke="#000000" stroke-opacity="0.35" stroke-width="6" d="M512 280Q546 478 744 512Q546 546 512 744Q478 546 280 512Q478 478 512 280Z"/>
+  </g>
+
+  <!-- Live text: needs the Inter font installed to display as designed -->
+  <g id="wordmark">
+    <text id="name" x="344" y="182" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="116" font-weight="700" letter-spacing="-5.2" fill="#0B0B0D">InstaFrame</text>
+    <text id="tagline" x="348" y="242" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="30" font-weight="400" fill="#4B5563">Viewport web engine and automatic mockups</text>
+  </g>
+</svg>

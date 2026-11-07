@@ -150,18 +150,13 @@ export function CaptureViewportPopover({
       role="dialog"
       aria-label="Capture viewport"
       style={{ top: position?.top ?? -9999, left: position?.left ?? -9999 }}
-      className="fixed z-[60] w-[320px] rounded-xl border border-white/10 bg-[#0a0a0c]/[0.98] backdrop-blur-xl p-3.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 select-none text-zinc-200"
+      className="surface-modal menu fixed z-[60] w-[320px] max-w-[calc(100vw-16px)] !p-0 select-none text-ink"
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2.5">
-        <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white">
-            <Camera className="h-3 w-3" />
-          </div>
-          <div>
-            <h4 className="text-xs font-semibold tracking-[-0.015em] text-white leading-none">Capture viewport</h4>
-            <span className="text-[10px] text-zinc-400">{deviceName}</span>
-          </div>
+      <div className="flex items-start justify-between gap-2 px-4 pb-1 pt-3.5">
+        <div className="min-w-0">
+          <h4 className="text-[15px] font-semibold leading-tight tracking-[-0.01em] text-ink">Capture viewport</h4>
+          <p className="mt-0.5 truncate text-xs text-ink-secondary">{deviceName}</p>
         </div>
         <button
           type="button"
@@ -169,108 +164,97 @@ export function CaptureViewportPopover({
             onClose();
             triggerRef.current?.focus();
           }}
-          className="rounded p-1 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
+          className="icon-btn -mr-1.5 -mt-0.5"
           aria-label="Close dialog"
         >
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
 
-      {/* Section 1: Capture Area */}
-      <div className="mb-3">
-        <label className="mb-1 block text-[11px] font-medium text-zinc-400">
-          Area
-        </label>
-        <div className="flex w-full items-start gap-2 rounded-lg border border-white/10 bg-black/60 p-2.5 text-left">
-          <div className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-white/40">
-            <div className="h-1.5 w-1.5 rounded-full bg-white" />
+      <div className="space-y-3.5 px-4 pb-4 pt-2.5">
+        {/* Section 1: Capture Area */}
+        <div>
+          <div className="section-label">Area</div>
+          <div className="radio-card is-selected">
+            <div className="min-w-0 flex-1">
+              <div className="radio-card-title">Current visible area</div>
+              <div className="radio-card-desc">What is visible at the current scroll position</div>
+            </div>
+            <span className="radio-dot" aria-hidden="true" />
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium leading-none text-white">Current visible area</div>
-            <div className="text-[10px] text-zinc-400 mt-0.5 leading-tight">
-              What is visible at the current scroll position
+        </div>
+
+        {/* Section 2: Output */}
+        <div>
+          <div className="section-label" id="capture-output-label">Output</div>
+          <div role="radiogroup" aria-labelledby="capture-output-label" className="grid grid-cols-1 gap-2">
+            {([
+              { value: "mockup", title: "With mockup", desc: "Open it in the device mockup studio", Icon: Layers, action: "output-mockup-option" },
+              { value: "clean", title: "Without mockup", desc: "Download the plain screenshot as PNG", Icon: Download, action: "output-clean-option" },
+            ] as const).map(({ value, title, desc, Icon, action }) => (
+              <button
+                key={value}
+                data-action={action}
+                type="button"
+                role="radio"
+                aria-checked={outputMode === value}
+                onClick={() => handleOutputModeChange(value)}
+                className="radio-card"
+              >
+                <Icon className="radio-card-icon" aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <span className="radio-card-title block">{title}</span>
+                  <span className="radio-card-desc block">{desc}</span>
+                </span>
+                <span className="radio-dot" aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Section 3: Device selector (if "With device mockup" is selected) */}
+        {outputMode === "mockup" && (
+          <div>
+            <label htmlFor="capture-mockup-frame" className="section-label block">
+              Mockup frame
+            </label>
+            <div className="relative">
+              <select
+                id="capture-mockup-frame"
+                value={selectedDevicePreset}
+                onChange={(e) => {
+                  const presetKey = e.target.value;
+                  setSelectedDevicePreset(presetKey);
+                  const frame = DEVICE_PRESETS[presetKey]?.defaultFrame || "none";
+                  setSelectedFrame(frame);
+                }}
+                className="field w-full cursor-pointer appearance-none pl-3 pr-8 text-[12.5px] outline-none hover:bg-control-hover focus:border-line-focus"
+              >
+                <optgroup label="Desktops and laptops">
+                  <option value="macbook-air-13">MacBook Air 13&quot;</option>
+                  <option value="macbook-pro-14">MacBook Pro 14&quot;</option>
+                  <option value="macbook-pro-16">MacBook Pro 16&quot;</option>
+                  <option value="pro-display-xdr">Apple Pro Display XDR</option>
+                </optgroup>
+                <optgroup label="Phones">
+                  <option value="iphone-15">iPhone 15</option>
+                  <option value="iphone-16-pro-max">iPhone 16 Pro Max</option>
+                  <option value="pixel-8">Google Pixel 8</option>
+                  <option value="samsung-s24-ultra">Samsung Galaxy S24 Ultra</option>
+                </optgroup>
+                <optgroup label="Tablets">
+                  <option value="ipad-pro-11">iPad Pro 11&quot;</option>
+                  <option value="ipad-pro-13">iPad Pro 13&quot;</option>
+                </optgroup>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-secondary" />
             </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Section 2: Output */}
-      <div className="mb-3">
-        <label className="mb-1 block text-[11px] font-medium text-zinc-400">
-          Output
-        </label>
-        <div className="inline-flex w-full rounded-full border border-white/10 bg-[#0a0a0c] p-1 text-xs gap-1 shadow-inner">
-          <button
-            data-action="output-mockup-option"
-            type="button"
-            onClick={() => handleOutputModeChange("mockup")}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-1 text-center text-xs font-medium transition duration-150 ${
-              outputMode === "mockup"
-                ? "bg-white/[0.12] font-medium text-white"
-                : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            <Layers className="h-3.5 w-3.5" />
-            <span className="text-[11px] leading-tight">With mockup</span>
-          </button>
-
-          <button
-            data-action="output-clean-option"
-            type="button"
-            onClick={() => handleOutputModeChange("clean")}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-1 text-center text-xs font-medium transition duration-150 ${
-              outputMode === "clean"
-                ? "bg-white/[0.12] font-medium text-white"
-                : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            <Download className="h-3.5 w-3.5" />
-            <span className="text-[11px] leading-tight">Without mockup</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Section 3: Device selector (if "With device mockup" is selected) */}
-      {outputMode === "mockup" && (
-        <div className="mb-3">
-          <label className="mb-1 block text-[11px] font-medium text-zinc-400">
-            Mockup frame
-          </label>
-          <div className="relative">
-            <select
-              value={selectedDevicePreset}
-              onChange={(e) => {
-                const presetKey = e.target.value;
-                setSelectedDevicePreset(presetKey);
-                const frame = DEVICE_PRESETS[presetKey]?.defaultFrame || "none";
-                setSelectedFrame(frame);
-              }}
-              className="w-full appearance-none rounded-full border border-white/10 bg-black px-3.5 py-1.5 text-xs text-white transition-colors hover:border-white/20 focus:border-white/30 focus:outline-none"
-            >
-              <optgroup label="Desktops and laptops">
-                <option value="macbook-air-13">MacBook Air 13&quot;</option>
-                <option value="macbook-pro-14">MacBook Pro 14&quot;</option>
-                <option value="macbook-pro-16">MacBook Pro 16&quot;</option>
-                <option value="pro-display-xdr">Apple Pro Display XDR</option>
-              </optgroup>
-              <optgroup label="Phones">
-                <option value="iphone-15">iPhone 15</option>
-                <option value="iphone-16-pro-max">iPhone 16 Pro Max</option>
-                <option value="pixel-8">Google Pixel 8</option>
-                <option value="samsung-s24-ultra">Samsung Galaxy S24 Ultra</option>
-              </optgroup>
-              <optgroup label="Tablets">
-                <option value="ipad-pro-11">iPad Pro 11&quot;</option>
-                <option value="ipad-pro-13">iPad Pro 13&quot;</option>
-              </optgroup>
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
-          </div>
-        </div>
-      )}
-
-      {/* Footer Controls */}
-      <div className="flex items-center justify-end gap-2 border-t border-white/10 pt-2.5">
+      {/* Pinned footer: secondary left, gradient primary fills the rest */}
+      <div className="modal-footer rounded-b-card">
         <button
           data-action="capture-cancel-btn"
           type="button"
@@ -278,7 +262,7 @@ export function CaptureViewportPopover({
             onClose();
             triggerRef.current?.focus();
           }}
-          className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-zinc-300 transition duration-150 hover:bg-white/10 hover:text-white"
+          className="btn btn-secondary btn-lg"
         >
           Cancel
         </button>
@@ -286,7 +270,7 @@ export function CaptureViewportPopover({
           data-action="capture-submit-btn"
           type="button"
           onClick={handleAction}
-          className="flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1 text-xs font-semibold text-black transition duration-150 hover:bg-zinc-200 shadow-sm"
+          className="btn btn-primary btn-lg"
         >
           <Camera className="h-3.5 w-3.5" />
           <span>Capture</span>

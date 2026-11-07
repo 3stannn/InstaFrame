@@ -16,16 +16,16 @@ const TABS = [
 
 export function Header({ currentTab, onTabChange }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-40 shrink-0 border-b border-white/10 bg-black/95 backdrop-blur-md">
+    <header className="sticky top-0 z-40 shrink-0 border-b border-line-subtle bg-shell">
       <div className="flex h-12 items-center justify-between gap-3 px-3.5 sm:px-5">
-        {/* Brand: logo and name only */}
-        <div className="flex items-center gap-2.5">
-          <Image src="/assets/icons/icon48.png" alt="" width={20} height={20} className="shrink-0 opacity-95" />
-          <span className="text-sm font-semibold tracking-[-0.015em] text-white">InstaFrame</span>
+        {/* Brand: the logo by itself, no tile behind it */}
+        <div className="flex items-center gap-2">
+          <Image src="/assets/icons/logo-mark.svg" alt="" width={22} height={22} className="shrink-0" unoptimized />
+          <span className="text-[15px] font-semibold tracking-[-0.01em] text-ink max-[420px]:sr-only">InstaFrame</span>
         </div>
 
         <nav aria-label="Studio">
-          <div className="inline-flex h-8 items-center gap-0.5 rounded-full border border-white/10 bg-[#0a0a0c] p-[2px] text-xs">
+          <div className="seg">
             {TABS.map(({ id, label, Icon }) => {
               const active = currentTab === id;
               return (
@@ -34,9 +34,7 @@ export function Header({ currentTab, onTabChange }: HeaderProps) {
                   type="button"
                   aria-current={active ? "page" : undefined}
                   onClick={() => onTabChange(id)}
-                  className={`flex h-[26px] items-center gap-1.5 rounded-full px-3 text-xs transition-colors duration-150 ease-out ${
-                    active ? "bg-white/[0.12] font-medium text-white" : "text-zinc-400 hover:bg-white/5 hover:text-white"
-                  }`}
+                  className="seg-item"
                 >
                   <Icon className="h-3.5 w-3.5" />
                   <span>{label}</span>

@@ -34,6 +34,8 @@ export interface CustomDropdownProps {
   showTriggerMeta?: boolean;
 }
 
+const MENU_MAX_HEIGHT = 288;
+
 export function CustomDropdown({
   value,
   onChange,
@@ -45,7 +47,31 @@ export function CustomDropdown({
   showTriggerMeta = true,
 }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [openUp, setOpenUp] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Menus near the bottom of their scroll container (or the window) open upward.
+  const toggleOpen = () => {
+    if (disabled) return;
+    if (!isOpen && containerRef.current) {
+      const trigger = containerRef.current.getBoundingClientRect();
+      let bottom = window.innerHeight;
+      let top = 0;
+      for (let el = containerRef.current.parentElement; el; el = el.parentElement) {
+        const overflowY = getComputedStyle(el).overflowY;
+        if (overflowY === "auto" || overflowY === "scroll" || overflowY === "hidden") {
+          const rect = el.getBoundingClientRect();
+          bottom = Math.min(bottom, rect.bottom);
+          top = Math.max(top, rect.top);
+          break;
+        }
+      }
+      const spaceBelow = bottom - trigger.bottom;
+      const spaceAbove = trigger.top - top;
+      setOpenUp(spaceBelow < MENU_MAX_HEIGHT + 12 && spaceAbove > spaceBelow);
+    }
+    setIsOpen(!isOpen);
+  };
 
   const selectedItem = items.find((item) => item.value === value) || items[0];
 
@@ -107,7 +133,7 @@ export function CustomDropdown({
     }
 
     const iconClasses = `h-3.5 w-3.5 flex-shrink-0 ${
-      isSelected ? "text-white" : "text-zinc-400"
+      isSelected ? "text-ink" : "text-ink-secondary"
     }`;
 
     switch (icon) {
@@ -136,12 +162,10 @@ export function CustomDropdown({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={toggleOpen}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className={`flex h-8 w-full items-center justify-between rounded-lg border bg-white/[0.03] pl-2.5 pr-2 text-left text-xs text-white transition-colors duration-150 ease-out hover:border-white/20 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50 ${
-          isOpen ? "border-white/25 bg-white/[0.06]" : "border-white/10"
-        }`}
+        className="field w-full justify-between pl-2.5 pr-2 text-left text-[12.5px]"
       >
         <div className="flex min-w-0 items-center gap-2 overflow-hidden">
           {renderIcon(
@@ -150,18 +174,18 @@ export function CustomDropdown({
             selectedItem?.swatchStyle,
             true
           )}
-          <span className="truncate text-zinc-100">
+          <span className="truncate text-ink">
             {selectedItem ? selectedItem.label : placeholder}
           </span>
         </div>
 
         <div className="ml-2 flex flex-shrink-0 items-center gap-1.5">
           {showTriggerMeta && selectedItem?.meta && (
-            <span className="text-[11px] tabular-nums text-zinc-500">{selectedItem.meta}</span>
+            <span className="text-[11px] tabular-nums text-ink-subtle">{selectedItem.meta}</span>
           )}
           <ChevronDown
-            className={`h-3.5 w-3.5 text-zinc-400 transition-transform duration-150 ease-out ${
-              isOpen ? "rotate-180 text-white" : ""
+            className={`h-3.5 w-3.5 text-ink-secondary transition-transform duration-150 ease-out ${
+              isOpen ? "rotate-180 text-ink" : ""
             }`}
           />
         </div>
@@ -171,7 +195,9 @@ export function CustomDropdown({
       {isOpen && (
         <div
           role="listbox"
-          className={`absolute top-full z-50 mt-1.5 max-h-72 overflow-y-auto rounded-xl border border-white/10 bg-[#0a0a0c]/[0.98] backdrop-blur-xl p-1.5 shadow-2xl ${
+          className={`menu absolute z-50 max-h-72 overflow-y-auto ${
+            openUp ? "menu-up bottom-full mb-1.5" : "top-full mt-1.5"
+          } ${
             align === "right"
               ? "right-0 w-full min-w-[248px]"
               : align === "left"
@@ -182,14 +208,10 @@ export function CustomDropdown({
           {sections.map((group, groupIdx) => (
             <div
               key={group.sectionName || `group-${groupIdx}`}
-              className={!group.sectionName && groupIdx > 0 ? "mt-1 border-t border-white/5 pt-1" : undefined}
+              className={!group.sectionName && groupIdx > 0 ? "menu-divider" : undefined}
             >
               {group.sectionName && (
-                <div
-                  className={`px-2.5 py-1 text-[11px] font-medium text-zinc-500 ${
-                    groupIdx > 0 ? "mt-1 border-t border-white/5 pt-1.5" : ""
-                  }`}
-                >
+                <div className={`menu-section ${groupIdx > 0 ? "menu-divider" : ""}`}>
                   {group.sectionName}
                 </div>
               )}
@@ -208,11 +230,7 @@ export function CustomDropdown({
                         onChange(item.value);
                         setIsOpen(false);
                       }}
-                      className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs transition-colors duration-100 ${
-                        isSelected
-                          ? "bg-white/[0.06] font-medium text-white"
-                          : "text-zinc-300 hover:bg-white/[0.04] hover:text-white"
-                      }`}
+                      className={`menu-item ${isSelected ? "font-medium" : ""}`}
                     >
                       <div className="flex min-w-0 items-center gap-2.5 overflow-hidden">
                         {renderIcon(item.icon, item.swatchClass, item.swatchStyle, isSelected)}
@@ -221,10 +239,10 @@ export function CustomDropdown({
 
                       <div className="ml-2 flex flex-shrink-0 items-center gap-1.5">
                         {item.meta && (
-                          <span className="text-[11px] tabular-nums text-zinc-500">{item.meta}</span>
+                          <span className="text-[11px] tabular-nums text-ink-subtle">{item.meta}</span>
                         )}
                         {isSelected && (
-                          <Check aria-hidden="true" className="h-3.5 w-3.5 flex-shrink-0 text-white" />
+                          <Check aria-hidden="true" className="h-3.5 w-3.5 flex-shrink-0 text-ink" />
                         )}
                       </div>
                     </button>

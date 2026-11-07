@@ -20,6 +20,8 @@ import {
   Maximize2,
   ArrowRight,
   Monitor,
+  MoveHorizontal,
+  Shrink,
 } from "lucide-react";
 import {
   DEVICE_PRESETS,
@@ -39,11 +41,10 @@ import { getFrameContentHeight } from "@/lib/frame-layout";
 import FRAME_METAS from "../../public/assets/frames/frame-meta.json";
 import { executeScreenshotCapture } from "@/lib/capture-client";
 
-const SECTION_TITLE = "pb-1 text-[11px] font-semibold text-zinc-500";
-const ROW = "grid grid-cols-[76px_minmax(0,1fr)] items-center gap-2";
-const ROW_LABEL = "text-xs text-zinc-400";
-const SECONDARY_BUTTON =
-  "flex h-8 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] text-[11px] font-medium text-zinc-300 transition-colors duration-150 hover:border-white/20 hover:bg-white/[0.06] hover:text-white";
+// Grouped settings cards: label on the left, control on the right.
+const ROW = "settings-row";
+const ROW_LABEL = "settings-label";
+const ROW_CONTROL = "w-[min(176px,60%)] shrink-0";
 
 interface MockupStudioProps {
   onShowToast: (
@@ -709,120 +710,123 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col lg:flex-row overflow-auto lg:overflow-hidden bg-black">
-      {/* Settings sidebar: a compact inspector, label column on the left */}
-      <aside className="w-full flex-shrink-0 overflow-y-auto border-b border-white/10 bg-[#0a0a0c] lg:w-80 lg:border-b-0 lg:border-r">
+    <div className="flex min-h-0 flex-1 flex-col lg:flex-row overflow-auto lg:overflow-hidden bg-canvas">
+      {/* Settings sidebar: grouped setting cards */}
+      <aside className="w-full flex-shrink-0 space-y-5 overflow-y-auto border-b border-line-subtle bg-shell p-4 lg:w-80 lg:border-b-0 lg:border-r">
         {/* Source */}
-        <section aria-labelledby="mockup-source" className="space-y-2 border-b border-white/[0.06] p-4">
-          <h2 id="mockup-source" className={SECTION_TITLE}>Source</h2>
+        <section aria-labelledby="mockup-source">
+          <h2 id="mockup-source" className="section-label">Source</h2>
 
-          <form aria-label="Open live website" onSubmit={handleOpenLive}>
-            <div className="flex h-8 items-center rounded-lg border border-white/10 bg-black pl-2.5 pr-[3px] transition-colors duration-150 focus-within:border-white/30">
-              <Globe aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-              <input
-                type="text"
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-                placeholder="https://yourwebsite.com"
-                aria-label="Website URL"
-                className="min-w-0 flex-1 bg-transparent px-2 text-xs text-white placeholder-zinc-500 outline-none"
-              />
-              {urlInput && (
+          <div className="space-y-2">
+            <form aria-label="Open live website" onSubmit={handleOpenLive}>
+              <div className="field pl-2.5 pr-[2px]">
+                <Globe aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-ink-subtle" />
+                <input
+                  type="text"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  placeholder="https://yourwebsite.com"
+                  aria-label="Website URL"
+                  className="min-w-0 flex-1 bg-transparent px-2 text-[12.5px] text-ink outline-none"
+                />
+                {urlInput && (
+                  <button
+                    type="button"
+                    onClick={() => setUrlInput("")}
+                    aria-label="Clear URL"
+                    className="icon-btn"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
                 <button
-                  type="button"
-                  onClick={() => setUrlInput("")}
-                  aria-label="Clear URL"
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-zinc-500 transition-colors duration-150 hover:text-white"
+                  type="submit"
+                  disabled={isCapturing}
+                  aria-label="Open website"
+                  title="Open website"
+                  className="icon-btn ml-[2px] bg-control-active text-ink hover:!bg-[#3e3e45]"
                 >
-                  <X className="h-3 w-3" />
+                  <ArrowRight className="h-3.5 w-3.5" />
                 </button>
-              )}
-              <button
-                type="submit"
-                disabled={isCapturing}
-                aria-label="Open website"
-                title="Open website"
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white/10 text-white transition-colors duration-150 hover:bg-white/20 disabled:opacity-40"
-              >
-                <ArrowRight className="h-3.5 w-3.5" />
+              </div>
+            </form>
+
+            {/* Snap view is the main action while the live website is showing */}
+            <button
+              type="button"
+              onClick={handleSnapLive}
+              disabled={!liveUrl || !liveReady || isCapturing}
+              className={`btn w-full ${previewStage === "live" ? "btn-primary" : "btn-neutral"}`}
+            >
+              {isCapturing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+              <span>{isCapturing ? "Capturing…" : "Snap view"}</span>
+            </button>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={handleCaptureScreen} className="btn btn-secondary !px-2">
+                <Monitor className="h-3.5 w-3.5 text-ink-secondary" />
+                <span>Capture screen</span>
               </button>
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="btn btn-secondary !px-2">
+                <Upload className="h-3.5 w-3.5 text-ink-secondary" />
+                <span>Upload image</span>
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
             </div>
-          </form>
 
-          <button
-            type="button"
-            onClick={handleSnapLive}
-            disabled={!liveUrl || !liveReady || isCapturing}
-            className="flex h-8 w-full items-center justify-center gap-2 rounded-lg bg-white text-xs font-semibold text-black transition-colors duration-150 hover:bg-zinc-200 disabled:bg-white/10 disabled:text-zinc-500"
-          >
-            {isCapturing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
-            <span>{isCapturing ? "Capturing…" : "Snap view"}</span>
-          </button>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={handleCaptureScreen} className={SECONDARY_BUTTON}>
-              <Monitor className="h-3.5 w-3.5 text-zinc-500" />
-              <span>Capture screen</span>
-            </button>
-            <button type="button" onClick={() => fileInputRef.current?.click()} className={SECONDARY_BUTTON}>
-              <Upload className="h-3.5 w-3.5 text-zinc-500" />
-              <span>Upload image</span>
-            </button>
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+            <p className="px-0.5 text-xs leading-relaxed text-ink-secondary">
+              {liveUrl && !liveReady && !isCapturing
+                ? "Loading the website…"
+                : "Open a website, scroll to the shot you want, then snap it. You can also paste an image."}
+            </p>
           </div>
-
-          <p className="text-[11px] leading-relaxed text-zinc-500">
-            {liveUrl && !liveReady && !isCapturing
-              ? "Loading the website…"
-              : "Open a website, scroll to the shot you want, then snap it. You can also paste an image."}
-          </p>
         </section>
 
         {/* Capture: settings that change the captured page */}
-        <section aria-labelledby="mockup-capture" className="space-y-2 border-b border-white/[0.06] p-4">
-          <h2 id="mockup-capture" className={SECTION_TITLE}>Capture</h2>
+        <section aria-labelledby="mockup-capture">
+          <h2 id="mockup-capture" className="section-label">Capture</h2>
 
-          <div className={ROW}>
-            <span className={ROW_LABEL}>Viewport</span>
-            <CustomDropdown value={selectedPreset} onChange={handlePresetChange} items={viewportItems} align="right" showTriggerMeta={false} />
-          </div>
-
-          {selectedPreset === "custom" && (
+          <div className="card">
             <div className={ROW}>
-              <span className={ROW_LABEL}>Size</span>
-              <div className="flex min-w-0 items-center gap-1.5">
-                <label className="flex h-8 min-w-0 flex-1 items-center rounded-lg border border-white/10 bg-black px-2.5 text-xs focus-within:border-white/30">
-                  <span className="mr-1.5 text-zinc-500">W</span>
-                  <input
-                    type="number"
-                    value={customW}
-                    onChange={(e) => setCustomW(parseInt(e.target.value, 10) || 1440)}
-                    aria-label="Custom width"
-                    className="w-full min-w-0 bg-transparent text-white outline-none tabular-nums"
-                  />
-                </label>
-                <label className="flex h-8 min-w-0 flex-1 items-center rounded-lg border border-white/10 bg-black px-2.5 text-xs focus-within:border-white/30">
-                  <span className="mr-1.5 text-zinc-500">H</span>
-                  <input
-                    type="number"
-                    value={customH}
-                    onChange={(e) => setCustomH(parseInt(e.target.value, 10) || 900)}
-                    aria-label="Custom height"
-                    className="w-full min-w-0 bg-transparent text-white outline-none tabular-nums"
-                  />
-                </label>
-              </div>
+              <span className={ROW_LABEL}>Viewport</span>
+              <CustomDropdown value={selectedPreset} onChange={handlePresetChange} items={viewportItems} align="right" showTriggerMeta={false} className={ROW_CONTROL} />
             </div>
-          )}
 
-          <div className={ROW}>
-            <span className={ROW_LABEL}>Zoom</span>
-            <CustomDropdown value={selectedZoom} onChange={handleZoomChange} items={zoomItems} align="right" />
-          </div>
+            {selectedPreset === "custom" && (
+              <div className={ROW}>
+                <span className={ROW_LABEL}>Size</span>
+                <div className={`flex min-w-0 items-center gap-1.5 ${ROW_CONTROL}`}>
+                  <label className="field min-w-0 flex-1 px-2.5 text-xs">
+                    <span className="mr-1.5 text-ink-subtle">W</span>
+                    <input
+                      type="number"
+                      value={customW}
+                      onChange={(e) => setCustomW(parseInt(e.target.value, 10) || 1440)}
+                      aria-label="Custom width"
+                      className="w-full min-w-0 bg-transparent text-ink outline-none tabular-nums"
+                    />
+                  </label>
+                  <label className="field min-w-0 flex-1 px-2.5 text-xs">
+                    <span className="mr-1.5 text-ink-subtle">H</span>
+                    <input
+                      type="number"
+                      value={customH}
+                      onChange={(e) => setCustomH(parseInt(e.target.value, 10) || 900)}
+                      aria-label="Custom height"
+                      className="w-full min-w-0 bg-transparent text-ink outline-none tabular-nums"
+                    />
+                  </label>
+                </div>
+              </div>
+            )}
 
-          <div className={ROW}>
-            <span className={ROW_LABEL}>Full page</span>
-            <div className="flex h-8 items-center justify-end">
+            <div className={ROW}>
+              <span className={ROW_LABEL}>Zoom</span>
+              <CustomDropdown value={selectedZoom} onChange={handleZoomChange} items={zoomItems} align="right" className={ROW_CONTROL} />
+            </div>
+
+            <div className={ROW}>
+              <span className={ROW_LABEL}>Full page</span>
               <button
                 type="button"
                 role="switch"
@@ -833,133 +837,127 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
                   setFullPage(next);
                   saveSettings({ fullPage: next });
                 }}
-                className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-150 ease-out ${
-                  fullPage ? "border-white/30 bg-white" : "border-white/15 bg-white/10 hover:border-white/25"
-                }`}
-              >
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none inline-block h-2.5 w-2.5 rounded-full transition-transform duration-150 ease-out ${
-                    fullPage ? "translate-x-3.5 bg-black" : "translate-x-0.5 bg-zinc-400"
-                  }`}
-                />
-              </button>
+                className="switch"
+              />
             </div>
           </div>
         </section>
 
         {/* Mockup: presentation only, no new capture needed */}
-        <section aria-labelledby="mockup-presentation" className="space-y-2 p-4">
-          <h2 id="mockup-presentation" className={SECTION_TITLE}>Mockup</h2>
+        <section aria-labelledby="mockup-presentation">
+          <h2 id="mockup-presentation" className="section-label">Mockup</h2>
 
-          <div className={ROW}>
-            <span className={ROW_LABEL}>Frame</span>
-            <CustomDropdown value={selectedFrame} onChange={handleFrameSelect} items={frameItems} align="right" showTriggerMeta={false} />
+          <div className="card">
+            <div className={ROW}>
+              <span className={ROW_LABEL}>Frame</span>
+              <CustomDropdown value={selectedFrame} onChange={handleFrameSelect} items={frameItems} align="right" showTriggerMeta={false} className={ROW_CONTROL} />
+            </div>
+
+            <div className={ROW}>
+              <span className={ROW_LABEL}>Backdrop</span>
+              <CustomDropdown value={selectedBackdrop} onChange={handleBackdropChange} items={backdropItems} align="right" showTriggerMeta={false} className={ROW_CONTROL} />
+            </div>
+
+            {selectedFrame.toLowerCase().includes("iphone") && (
+              <div className={ROW}>
+                <span className={ROW_LABEL}>Status bar</span>
+                <div className="flex items-center gap-3">
+                  <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-ink">
+                    <input
+                      type="checkbox"
+                      checked={autoNotch}
+                      onChange={(e) => {
+                        setAutoNotch(e.target.checked);
+                        saveSettings({ autoNotch: e.target.checked });
+                      }}
+                      className="checkbox"
+                    />
+                    <span>Match page</span>
+                  </label>
+                  <input
+                    type="color"
+                    value={notchColor}
+                    onChange={(e) => {
+                      setNotchColor(e.target.value);
+                      setAutoNotch(false);
+                      saveSettings({ notchColor: e.target.value, autoNotch: false });
+                    }}
+                    aria-label="Status bar color"
+                    title="Status bar color"
+                    className="status-color-dot h-5 w-5 cursor-pointer rounded-full"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className={ROW}>
-            <span className={ROW_LABEL}>Backdrop</span>
-            <CustomDropdown value={selectedBackdrop} onChange={handleBackdropChange} items={backdropItems} align="right" showTriggerMeta={false} />
-          </div>
-
-          <div className={ROW}>
-            <span className={ROW_LABEL}>Fit</span>
-            <div role="group" aria-label="Screen fit" className="grid h-8 grid-cols-2 gap-0.5 rounded-lg border border-white/10 bg-black p-[3px]">
+          {/* Screen fit: two radio choice cards */}
+          <div className="mt-4">
+            <div id="mockup-fit" className="section-label">Fit</div>
+            <div role="radiogroup" aria-labelledby="mockup-fit" className="grid grid-cols-2 gap-2">
               {([
-                { label: "Fill width", value: "smart" },
-                { label: "Whole page", value: "contain" },
+                { label: "Fill width", desc: "Fills the screen width", value: "smart", Icon: MoveHorizontal },
+                { label: "Whole page", desc: "Fits the full capture", value: "contain", Icon: Shrink },
               ] as const).map((option) => {
                 const active = option.value === "contain" ? fitMode === "contain" : fitMode !== "contain";
                 return (
                   <button
                     key={option.value}
                     type="button"
-                    aria-pressed={active}
+                    role="radio"
+                    aria-checked={active}
                     onClick={() => {
                       setFitMode(option.value);
                       saveSettings({ fitMode: option.value });
                     }}
-                    className={`rounded-md text-[11px] transition-colors duration-150 ${
-                      active ? "bg-white/[0.12] font-medium text-white" : "text-zinc-400 hover:text-white"
-                    }`}
+                    className="radio-card flex-col !gap-2"
                   >
-                    {option.label}
+                    <span className="flex w-full items-center justify-between">
+                      <option.Icon className="radio-card-icon !mt-0" aria-hidden="true" />
+                      <span className="radio-dot !mt-0" aria-hidden="true" />
+                    </span>
+                    <span>
+                      <span className="radio-card-title block">{option.label}</span>
+                      <span className="radio-card-desc block">{option.desc}</span>
+                    </span>
                   </button>
                 );
               })}
             </div>
           </div>
-
-          {selectedFrame.toLowerCase().includes("iphone") && (
-            <div className={ROW}>
-              <span className={ROW_LABEL}>Status bar</span>
-              <div className="flex h-8 items-center justify-between gap-2">
-                <label className="flex cursor-pointer items-center gap-1.5 text-xs text-zinc-300">
-                  <input
-                    type="checkbox"
-                    checked={autoNotch}
-                    onChange={(e) => {
-                      setAutoNotch(e.target.checked);
-                      saveSettings({ autoNotch: e.target.checked });
-                    }}
-                    className="h-3.5 w-3.5 rounded accent-white"
-                  />
-                  <span>Match page</span>
-                </label>
-                <input
-                  type="color"
-                  value={notchColor}
-                  onChange={(e) => {
-                    setNotchColor(e.target.value);
-                    setAutoNotch(false);
-                    saveSettings({ notchColor: e.target.value, autoNotch: false });
-                  }}
-                  aria-label="Status bar color"
-                  title="Status bar color"
-                  className="status-color-dot h-5 w-5 cursor-pointer rounded-full"
-                />
-              </div>
-            </div>
-          )}
         </section>
       </aside>
 
       {/* Canvas Mockup Preview Surface */}
       <div className="flex min-h-[420px] lg:min-h-0 flex-1 flex-col overflow-hidden">
         {/* Preview Topbar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-[#0a0a0c] px-4 py-2.5">
-          <div className="inline-flex items-center rounded-full border border-white/10 bg-[#0a0a0c] p-1 text-xs gap-1 shadow-inner">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle bg-shell px-4 py-2.5">
+          <div className="seg">
             <button
               type="button"
               onClick={() => setPreviewStage("live")}
               disabled={!liveUrl}
-              className={`rounded-full px-3 py-1 transition duration-150 active:scale-[0.98] disabled:opacity-40 ${
-                previewStage === "live"
-                  ? "bg-white/[0.12] font-medium text-white"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5"
-              }`}
+              aria-pressed={previewStage === "live"}
+              className="seg-item"
             >
               Live website
             </button>
             <button
               type="button"
               onClick={() => setPreviewStage("mockup")}
-              className={`rounded-full px-3 py-1 transition duration-150 active:scale-[0.98] ${
-                previewStage === "mockup"
-                  ? "bg-white/[0.12] font-medium text-white"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5"
-              }`}
+              aria-pressed={previewStage === "mockup"}
+              className="seg-item"
             >
               Mockup
             </button>
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold tracking-[-0.015em] text-white">
+            <span className="text-[13px] font-semibold tracking-[-0.01em] text-ink">
               {previewStage === "live" ? "Live preview" : "Mockup preview"}
             </span>
             {compositeDims && (
-              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-mono tabular-nums text-zinc-300">
+              <span className="badge font-mono tabular-nums">
                 {compositeDims}
               </span>
             )}
@@ -967,7 +965,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
               <button
                 type="button"
                 onClick={() => handleCaptureUrl(undefined, urlInput, selectedPreset, selectedFrame)}
-                className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-medium text-zinc-300 hover:bg-white/10 hover:border-white/20 hover:text-white active:scale-[0.98] transition duration-150"
+                className="btn btn-neutral !h-[26px] !gap-1 !rounded-inner !px-2.5 !text-[11px]"
               >
                 <RefreshCw className="h-2.5 w-2.5" />
                 <span>Recapture at {DEVICE_PRESETS[selectedPreset]?.name || "custom size"}</span>
@@ -976,13 +974,14 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
           </div>
 
           {/* Center: Canvas Zoom & Pan Controls (Floating Segmented Control) */}
-          <div className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-[#0a0a0c] p-1 text-xs shadow-inner">
+          <div className="seg">
             <button
               type="button"
               onClick={handleZoomOut}
               disabled={canvasZoom <= 0.5}
               title="Zoom Out (Ctrl + Wheel Down)"
-              className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-white disabled:opacity-40 transition duration-150 active:scale-[0.98]"
+              aria-label="Zoom out"
+              className="seg-item !w-[26px] !px-0"
             >
               <Minus className="h-3 w-3" />
             </button>
@@ -991,7 +990,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
               type="button"
               onClick={handleZoomFit}
               title="Click to reset to Fit"
-              className="h-6 px-2.5 text-[11px] font-mono font-medium text-zinc-300 hover:bg-white/10 hover:text-white rounded-full transition-colors tabular-nums"
+              className="seg-item !px-2 font-mono !text-[11px] tabular-nums"
             >
               {Math.round(canvasZoom * 100)}%
             </button>
@@ -1001,21 +1000,19 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
               onClick={handleZoomIn}
               disabled={canvasZoom >= 3.0}
               title="Zoom In (Ctrl + Wheel Up)"
-              className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-white disabled:opacity-40 transition duration-150 active:scale-[0.98]"
+              aria-label="Zoom in"
+              className="seg-item !w-[26px] !px-0"
             >
               <Plus className="h-3 w-3" />
             </button>
 
-            <div className="h-3.5 w-px bg-white/10" />
+            <div className="mx-0.5 h-3.5 w-px bg-line" />
 
             <button
               type="button"
               onClick={handleZoomFit}
-              className={`h-6 px-3 text-[10px] font-medium rounded-full transition duration-150 active:scale-[0.98] ${
-                canvasZoom === 1 && pan.x === 0 && pan.y === 0
-                  ? "bg-white/[0.12] font-medium text-white"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5"
-              }`}
+              aria-pressed={canvasZoom === 1 && pan.x === 0 && pan.y === 0}
+              className="seg-item"
               title="Fit mockup to viewport"
             >
               Fit
@@ -1026,9 +1023,10 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
                 type="button"
                 onClick={handleZoomFit}
                 title="Reset zoom and pan"
-                className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-white transition duration-150 active:scale-[0.98]"
+                aria-label="Reset zoom and pan"
+                className="seg-item !w-[26px] !px-0"
               >
-                <RotateCcw className="h-2.5 w-2.5" />
+                <RotateCcw className="h-3 w-3" />
               </button>
             )}
           </div>
@@ -1039,18 +1037,18 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
               type="button"
               onClick={handleCopy}
               disabled={!compositeDataUrl || isCompositing || isCapturing}
-              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-[#0a0a0c] px-3.5 py-1.5 text-xs font-medium text-zinc-200 transition duration-150 hover:border-white/20 hover:bg-[#141417] hover:text-white active:scale-[0.98] disabled:opacity-40"
+              className="btn btn-secondary"
             >
-              {copySuccess ? <Check className="h-3.5 w-3.5 text-white" /> : <Copy className="h-3.5 w-3.5" />}
+              {copySuccess ? <Check className="h-3.5 w-3.5 text-ink" /> : <Copy className="h-3.5 w-3.5" />}
               <span>{copySuccess ? "Copied" : "Copy"}</span>
             </button>
 
-            {/* Download Button */}
+            {/* Download: the main action once a mockup is showing */}
             <button
               type="button"
               onClick={handleDownload}
               disabled={!compositeDataUrl || isCompositing || isCapturing}
-              className="flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-xs font-semibold text-black shadow-sm transition duration-150 hover:bg-zinc-200 active:scale-[0.98] disabled:opacity-40"
+              className={`btn ${previewStage === "mockup" ? "btn-primary" : "btn-neutral"}`}
             >
               <Download className="h-3.5 w-3.5" />
               <span>Download PNG</span>
@@ -1070,14 +1068,14 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onDoubleClick={handleDoubleClick}
-          className={`studio-canvas-bg relative ${previewStage === "live" && liveUrl ? "hidden" : "flex"} flex-1 items-center justify-center overflow-hidden p-6 select-none bg-black ${
+          className={`studio-canvas-bg relative ${previewStage === "live" && liveUrl ? "hidden" : "flex"} flex-1 items-center justify-center overflow-hidden p-6 select-none ${
             isDragging ? "cursor-grabbing" : "cursor-grab"
           }`}
         >
           {/* Non-blocking update indicator when re-compositing or capturing */}
           {(isCompositing || isCapturing) && compositeDataUrl && (
-            <div className="absolute top-4 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-[#0a0a0c]/95 px-3 py-1 shadow-xl backdrop-blur-md text-xs text-zinc-300">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+            <div className="absolute top-4 z-20 flex items-center gap-2 rounded-full border border-line bg-[rgba(24,24,27,0.92)] px-3 py-1 text-xs text-ink-secondary shadow-[0_8px_24px_-6px_rgba(0,0,0,0.6)] backdrop-blur-md">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-ink" />
               <span>{isCapturing ? "Capturing…" : "Updating mockup…"}</span>
             </div>
           )}
@@ -1098,30 +1096,30 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
                 src={compositeDataUrl}
                 alt="Device Mockup"
                 draggable={false}
-                className="max-h-[78vh] max-w-[85%] object-contain rounded-xl border border-white/10 shadow-2xl"
+                className="max-h-[78vh] max-w-[85%] object-contain rounded-card border border-line shadow-[0_16px_36px_-10px_rgba(0,0,0,0.55),0_2px_6px_rgba(0,0,0,0.4)]"
               />
             </div>
           ) : isCompositing || isCapturing ? (
             <div className="flex flex-col items-center gap-2 pointer-events-none">
-              <Loader2 className="h-7 w-7 animate-spin text-white" />
-              <span className="text-xs text-zinc-400">
+              <Loader2 className="h-7 w-7 animate-spin text-ink" />
+              <span className="text-xs text-ink-secondary">
                 {isCapturing ? "Capturing…" : "Building mockup…"}
               </span>
             </div>
           ) : (
-            <div className="text-center text-zinc-500 text-xs pointer-events-none">
+            <div className="max-w-xs text-center text-[13px] text-ink-secondary pointer-events-none">
               Open a website, scroll or follow links, then click Snap view to create your mockup.
             </div>
           )}
 
           {/* Floating Zoom & Pan Pill */}
           {compositeDataUrl && (
-            <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-[#0a0a0c]/90 px-3 py-1 shadow-xl backdrop-blur-md text-xs text-zinc-400">
-              <span className="font-mono text-[11px] tabular-nums text-zinc-300">
+            <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2 rounded-full border border-line bg-[rgba(24,24,27,0.92)] px-3 py-1 text-xs text-ink-secondary shadow-[0_8px_24px_-6px_rgba(0,0,0,0.6)] backdrop-blur-md">
+              <span className="font-mono text-[11px] tabular-nums text-ink">
                 {Math.round(canvasZoom * 100)}%
               </span>
-              <span className="text-zinc-600">•</span>
-              <span className="text-[10px] text-zinc-500">
+              <span className="text-ink-subtle">•</span>
+              <span className="text-[10px] text-ink-subtle">
                 Ctrl + Wheel or Drag
               </span>
             </div>

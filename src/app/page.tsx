@@ -64,7 +64,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="flex h-dvh min-h-0 flex-col bg-black font-sans">
+    <div className="flex h-dvh min-h-0 flex-col bg-canvas font-sans">
       {/* Top Navigation */}
       <Header
         currentTab={currentTab}

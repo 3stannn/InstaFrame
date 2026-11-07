@@ -44,20 +44,20 @@ function ToastItem({
   const icons = {
     success: <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />,
     error: <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />,
-    info: <Info className="h-4 w-4 text-zinc-300 shrink-0" />,
+    info: <Info className="h-4 w-4 text-ink-secondary shrink-0" />,
   };
 
   return (
     <div
-      className="pointer-events-auto flex items-center gap-2.5 rounded-xl border border-white/10 bg-[#0a0a0c]/[0.98] px-3.5 py-2.5 text-xs text-white shadow-2xl shadow-black/80 backdrop-blur-xl transition duration-150 animate-in fade-in slide-in-from-bottom-2"
+      className="menu menu-up pointer-events-auto flex items-center gap-2.5 !rounded-card !py-2 !pl-3.5 !pr-2 text-[12.5px] text-ink"
     >
       {icons[toast.type]}
-      <span className="font-medium tracking-tight">{toast.message}</span>
+      <span className="font-medium">{toast.message}</span>
       <button
         type="button"
         aria-label="Dismiss notification"
         onClick={() => onDismiss(toast.id)}
-        className="ml-2 rounded-full p-1 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
+        className="icon-btn ml-1"
       >
         <X className="h-3.5 w-3.5" />
       </button>

@@ -657,11 +657,6 @@ export function ResponsiveStudio({
 
   const viewerOrigin = typeof window !== "undefined" ? window.location.origin : "";
 
-  const segmentButton = (active: boolean) =>
-    `h-[26px] rounded-full px-3 text-xs transition-colors duration-150 ${
-      active ? "bg-white/[0.12] font-medium text-white" : "text-zinc-400 hover:bg-white/5 hover:text-white"
-    }`;
-
   const zoomSteps: { label: string; value: "auto" | number }[] = [
     { label: "Fit", value: "auto" },
     { label: "100%", value: 1 },
@@ -670,30 +665,30 @@ export function ResponsiveStudio({
   ];
 
   return (
-    <div className="flex min-h-0 h-full flex-col bg-black text-zinc-100">
+    <div className="flex min-h-0 h-full flex-col bg-canvas text-ink">
       {/* Studio toolbar */}
-      <div className="relative z-30 shrink-0 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-white/10 bg-[#0a0a0c]/95 backdrop-blur-md px-4 py-2.5">
+      <div className="relative z-30 shrink-0 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line-subtle bg-shell px-4 py-2.5">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          {/* URL bar: one 32px pill, reload and Go inside as 26px buttons */}
+          {/* URL bar: one 32px control, reload and Go inside as 26px buttons */}
           <form
             onSubmit={handleNavigate}
-            className="flex h-8 min-w-0 max-w-xl flex-1 items-center rounded-full border border-white/10 bg-black pl-3 pr-[2px] transition-colors duration-150 focus-within:border-white/30"
+            className="field min-w-0 max-w-xl flex-1 pl-3 pr-[2px]"
           >
-            <Globe aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+            <Globe aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-ink-subtle" />
             <input
               type="text"
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
               placeholder="https://yourwebsite.com"
               aria-label="Website URL"
-              className="min-w-0 flex-1 bg-transparent px-2 text-xs text-white placeholder-zinc-500 outline-none"
+              className="min-w-0 flex-1 bg-transparent px-2 text-[12.5px] text-ink outline-none"
             />
             {urlInput && (
               <button
                 type="button"
                 onClick={() => setUrlInput("")}
                 aria-label="Clear URL"
-                className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-zinc-500 transition-colors duration-150 hover:text-white"
+                className="icon-btn"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -703,26 +698,26 @@ export function ResponsiveStudio({
               onClick={handleReloadAll}
               title="Reload all viewports"
               aria-label="Reload all viewports"
-              className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors duration-150 hover:bg-white/10 hover:text-white"
+              className="icon-btn"
             >
               <RefreshCw className="h-3.5 w-3.5" />
             </button>
             <button
               type="submit"
-              className="ml-[2px] h-[26px] shrink-0 rounded-full bg-white/[0.12] px-3.5 text-xs font-medium text-white transition-colors duration-150 hover:bg-white/20"
+              className="ml-[2px] h-[26px] shrink-0 rounded-inner bg-control-active px-3 text-xs font-medium text-ink transition-colors duration-150 ease-out hover:bg-[#3e3e45] active:scale-[0.98]"
             >
               Go
             </button>
           </form>
 
-          {/* Add viewport: the only white button */}
+          {/* Add viewport: the screen's main action, the only gradient button */}
           <div ref={addMenuRef} className="relative shrink-0">
             <button
               type="button"
               onClick={() => setAddMenuOpen((prev) => !prev)}
               aria-haspopup="menu"
               aria-expanded={addMenuOpen}
-              className="flex h-8 items-center gap-1.5 rounded-full bg-white px-3.5 text-xs font-semibold text-black transition-colors duration-150 hover:bg-zinc-200"
+              className="btn btn-primary"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Add viewport</span>
@@ -731,14 +726,14 @@ export function ResponsiveStudio({
             {addMenuOpen && (
               <div
                 role="menu"
-                className="absolute left-0 top-full z-50 mt-1.5 max-h-[380px] w-72 overflow-y-auto rounded-xl border border-white/10 bg-[#0a0a0c]/[0.98] p-1.5 shadow-2xl backdrop-blur-xl"
+                className="menu absolute right-0 top-full z-50 sm:left-0 sm:right-auto mt-1.5 max-h-[min(380px,calc(100dvh-140px))] w-72 max-w-[calc(100vw-32px)] overflow-y-auto"
               >
                 {DEVICE_CATEGORIES.map((category, catIdx) => {
                   const items = Object.entries(DEVICE_PRESETS).filter(([, preset]) => preset.category === category);
                   if (items.length === 0) return null;
                   return (
-                    <div key={category} className={catIdx > 0 ? "mt-1 border-t border-white/5 pt-1.5" : ""}>
-                      <div className="px-2.5 py-1 text-[11px] font-medium text-zinc-500">
+                    <div key={category} className={catIdx > 0 ? "menu-divider" : ""}>
+                      <div className="menu-section">
                         {CATEGORY_LABELS[category]}
                       </div>
                       <div className="space-y-0.5">
@@ -757,13 +752,13 @@ export function ResponsiveStudio({
                               type="button"
                               role="menuitem"
                               onClick={() => handleAddDevice(key)}
-                              className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 transition-colors duration-100 hover:bg-white/[0.06] hover:text-white"
+                              className="menu-item"
                             >
                               <span className="flex min-w-0 items-center gap-2">
-                                <IconComp className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                                <IconComp className="h-3.5 w-3.5 shrink-0 text-ink-secondary" />
                                 <span className="truncate">{preset.name}</span>
                               </span>
-                              <span className="ml-2 shrink-0 text-[11px] tabular-nums text-zinc-500">
+                              <span className="ml-2 shrink-0 text-[11px] tabular-nums text-ink-subtle">
                                 {preset.width} × {preset.height}
                               </span>
                             </button>
@@ -778,13 +773,13 @@ export function ResponsiveStudio({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-3">
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-x-3 gap-y-2">
           {/* Preview mode */}
-          <div role="group" aria-label="Preview mode" className="inline-flex h-8 items-center gap-0.5 rounded-full border border-white/10 bg-[#0a0a0c] p-[2px]">
-            <button type="button" aria-pressed={previewMode === "live"} onClick={() => setPreviewMode("live")} className={segmentButton(previewMode === "live")}>
+          <div role="group" aria-label="Preview mode" className="seg">
+            <button type="button" aria-pressed={previewMode === "live"} onClick={() => setPreviewMode("live")} className="seg-item">
               Live
             </button>
-            <button type="button" aria-pressed={previewMode === "preview"} onClick={() => setPreviewMode("preview")} className={segmentButton(previewMode === "preview")}>
+            <button type="button" aria-pressed={previewMode === "preview"} onClick={() => setPreviewMode("preview")} className="seg-item">
               Snapshot
             </button>
           </div>
@@ -797,29 +792,20 @@ export function ResponsiveStudio({
               aria-checked={syncScroll}
               aria-label="Sync scroll"
               onClick={() => setSyncScroll(!syncScroll)}
-              className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full border transition-colors duration-150 ease-out ${
-                syncScroll ? "border-white/30 bg-white" : "border-white/15 bg-white/10 hover:border-white/25"
-              }`}
-            >
-              <span
-                aria-hidden="true"
-                className={`pointer-events-none inline-block h-2.5 w-2.5 rounded-full transition-transform duration-150 ease-out ${
-                  syncScroll ? "translate-x-3.5 bg-black" : "translate-x-0.5 bg-zinc-400"
-                }`}
-              />
-            </button>
-            <span className="text-xs font-medium text-zinc-300">Sync scroll</span>
+              className="switch switch-dense"
+            />
+            <span className="text-[12.5px] font-medium text-ink">Sync scroll</span>
           </label>
 
           {/* Zoom */}
-          <div role="group" aria-label="Zoom" className="inline-flex h-8 items-center gap-0.5 rounded-full border border-white/10 bg-[#0a0a0c] p-[2px]">
+          <div role="group" aria-label="Zoom" className="seg">
             {zoomSteps.map((step) => (
               <button
                 key={step.label}
                 type="button"
                 aria-pressed={currentScale === step.value}
                 onClick={() => setCurrentScale(step.value)}
-                className={segmentButton(currentScale === step.value)}
+                className="seg-item"
               >
                 {step.label}
               </button>
@@ -829,7 +815,7 @@ export function ResponsiveStudio({
       </div>
 
       {/* Canvas: viewports wrap into centered rows; overflow only goes right/down */}
-      <div ref={canvasRef} className="studio-canvas-bg relative min-h-0 flex-1 overflow-auto bg-black p-6">
+      <div ref={canvasRef} className="studio-canvas-bg relative min-h-0 flex-1 overflow-auto p-6">
         <div className="studio-rows flex flex-wrap items-start gap-8">
           {activeDevices.map((device) => (
             <DeviceFrame

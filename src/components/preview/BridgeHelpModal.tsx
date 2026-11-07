@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Copy, Check, ExternalLink, ShieldCheck, Wifi, Code2 } from "lucide-react";
+import Image from "next/image";
+import { X, Copy, Check, ShieldCheck, Code2 } from "lucide-react";
 
 interface BridgeHelpModalProps {
   isOpen: boolean;
@@ -26,92 +27,90 @@ export function BridgeHelpModal({ isOpen, onClose, viewerOrigin }: BridgeHelpMod
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(17,17,19,0.82)] p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-2xl rounded-2xl border border-white/10 bg-[#0a0a0c]/[0.98] backdrop-blur-xl p-6 shadow-2xl text-zinc-200"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bridge-help-title"
+        className="surface-modal menu relative flex max-h-[calc(100dvh-32px)] w-full max-w-2xl flex-col !p-0 text-ink"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3.5">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white">
-              <Wifi className="h-3.5 w-3.5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold tracking-[-0.015em] text-white">
-                Cooperative Preview Bridge (Mode B)
-              </h3>
-              <p className="text-xs text-zinc-400">
-                Enable synchronized scrolling and navigation for websites you control
-              </p>
-            </div>
-          </div>
+        {/* Header: logo, title, one-line subtitle, close in the corner */}
+        <div className="relative flex shrink-0 flex-col items-center px-6 pb-4 pt-5 text-center">
+          <Image src="/assets/icons/logo-mark.svg" alt="" width={32} height={32} unoptimized />
+          <h3 id="bridge-help-title" className="mt-2.5 text-[15px] font-semibold tracking-[-0.01em] text-ink">
+            Cooperative Preview Bridge (Mode B)
+          </h3>
+          <p className="mt-0.5 text-[13px] text-ink-secondary">
+            Enable synchronized scrolling and navigation for websites you control
+          </p>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
+            aria-label="Close"
+            className="icon-btn absolute right-3 top-3"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="space-y-3.5 text-xs leading-relaxed max-h-[70vh] overflow-y-auto pr-1">
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 pb-5 text-[13px] leading-relaxed">
           {/* Section 1: Server Framing Permission */}
           <div>
-            <h4 className="flex items-center gap-1.5 font-semibold text-white mb-1 text-xs">
-              <ShieldCheck className="h-3.5 w-3.5 text-white" />
+            <h4 className="mb-1 flex items-center gap-1.5 text-[13px] font-medium text-ink">
+              <ShieldCheck className="h-3.5 w-3.5 text-ink-secondary" />
               1. Authorize InstaFrame in your server headers
             </h4>
-            <p className="text-zinc-400 mb-1.5 text-[11.5px]">
+            <p className="mb-2 text-xs text-ink-secondary">
               By default, browsers block embedding pages with{" "}
-              <code className="text-zinc-300">X-Frame-Options: DENY</code> or restrictive CSP.
+              <code className="text-ink">X-Frame-Options: DENY</code> or restrictive CSP.
               Configure your server to allow this specific viewer origin:
             </p>
-            <div className="relative rounded-lg border border-white/10 bg-black p-3 font-mono text-[11px] text-zinc-300">
+            <div className="relative rounded-control border border-line bg-canvas p-3 font-mono text-[11px] text-ink">
               <button
                 type="button"
                 onClick={() => handleCopy(cspHeader, setCopiedCsp)}
-                className="absolute right-2 top-2 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] text-zinc-300 hover:bg-white/10 hover:text-white active:scale-[0.98] transition flex items-center gap-1"
+                className="btn btn-neutral absolute right-2 top-2 !h-[26px] !gap-1 !rounded-inner !px-2.5 !text-[11px]"
               >
-                {copiedCsp ? <Check className="h-3 w-3 text-white" /> : <Copy className="h-3 w-3" />}
+                {copiedCsp ? <Check className="h-3 w-3 text-ink" /> : <Copy className="h-3 w-3" />}
                 <span>{copiedCsp ? "Copied" : "Copy"}</span>
               </button>
-              <pre className="overflow-x-auto pr-16">{cspHeader}</pre>
+              <pre className="overflow-x-auto pr-20">{cspHeader}</pre>
             </div>
-            <p className="text-[10.5px] text-zinc-500 mt-1">
-              Note: Avoid setting <code className="text-zinc-400">X-Frame-Options</code> on these pages, as it does not support multiple origins.
+            <p className="mt-1.5 text-[11.5px] text-ink-subtle">
+              Note: Avoid setting <code className="text-ink-secondary">X-Frame-Options</code> on these pages, as it does not support multiple origins.
             </p>
           </div>
 
           {/* Section 2: Install Target Bridge Script */}
           <div>
-            <h4 className="flex items-center gap-1.5 font-semibold text-white mb-1 text-xs">
-              <Code2 className="h-3.5 w-3.5 text-white" />
+            <h4 className="mb-1 flex items-center gap-1.5 text-[13px] font-medium text-ink">
+              <Code2 className="h-3.5 w-3.5 text-ink-secondary" />
               2. Add the bridge script to your website
             </h4>
-            <p className="text-zinc-400 mb-1.5 text-[11.5px]">
+            <p className="mb-2 text-xs text-ink-secondary">
               Add this lightweight script to your target site. It automatically negotiates capabilities and synchronizes scrolling:
             </p>
-            <div className="relative rounded-lg border border-white/10 bg-black p-3 font-mono text-[11px] text-zinc-300">
+            <div className="relative rounded-control border border-line bg-canvas p-3 font-mono text-[11px] text-ink">
               <button
                 type="button"
                 onClick={() => handleCopy(scriptTag, setCopiedScript)}
-                className="absolute right-2 top-2 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] text-zinc-300 hover:bg-white/10 hover:text-white active:scale-[0.98] transition flex items-center gap-1"
+                className="btn btn-neutral absolute right-2 top-2 !h-[26px] !gap-1 !rounded-inner !px-2.5 !text-[11px]"
               >
-                {copiedScript ? <Check className="h-3 w-3 text-white" /> : <Copy className="h-3 w-3" />}
+                {copiedScript ? <Check className="h-3 w-3 text-ink" /> : <Copy className="h-3 w-3" />}
                 <span>{copiedScript ? "Copied" : "Copy"}</span>
               </button>
-              <pre className="overflow-x-auto pr-16">{scriptTag}</pre>
+              <pre className="overflow-x-auto pr-20">{scriptTag}</pre>
             </div>
           </div>
 
           {/* Section 3: Security Boundaries */}
-          <div className="border-t border-white/10 pt-3">
-            <h5 className="font-semibold text-zinc-200 mb-1 text-xs">Security &amp; Privacy Boundaries:</h5>
-            <ul className="list-disc pl-4 space-y-1 text-zinc-400 text-[11px]">
+          <div className="card px-4 py-3">
+            <h5 className="mb-1 text-[13px] font-medium text-ink">Security &amp; Privacy Boundaries:</h5>
+            <ul className="list-disc space-y-1 pl-4 text-xs text-ink-secondary">
               <li>The bridge requires explicit origin validation and will reject untrusted parent windows.</li>
               <li>Passwords, credit cards, file inputs, and form submissions are strictly excluded from replay.</li>
               <li>When navigating away to an external website without the bridge, synchronization gracefully disconnects.</li>
@@ -119,12 +118,12 @@ export function BridgeHelpModal({ isOpen, onClose, viewerOrigin }: BridgeHelpMod
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end border-t border-white/10 pt-3 mt-3.5">
+        {/* Pinned footer */}
+        <div className="modal-footer shrink-0 justify-end rounded-b-card">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full bg-white px-4 py-1.5 text-xs font-semibold text-black hover:bg-zinc-200 active:scale-[0.98] transition shadow-sm"
+            className="btn btn-secondary btn-lg"
           >
             Got it
           </button>

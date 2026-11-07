@@ -33,7 +33,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={inter.variable}>
-      <body className={`${inter.className} min-h-screen bg-black text-white antialiased selection:bg-white selection:text-black`}>
+      <body className={`${inter.className} min-h-screen bg-canvas text-ink antialiased selection:bg-white selection:text-black`}>
         {children}
       </body>
     </html>

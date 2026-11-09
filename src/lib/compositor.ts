@@ -197,15 +197,14 @@ export async function renderMockup({
       drawW,
       drawH
     );
-  } else if (fitMode === "cover") {
+  } else {
+    // "smart" / "cover": fill the whole screen without stretching, anchored beneath the
+    // browser chrome. Tall captures fit the width and crop at the bottom; captures wider
+    // than the screen (e.g. a screen/tab capture of a wide browser window) scale up to
+    // the screen height and crop evenly at the sides instead of leaving a blank gap below.
     const scale = Math.max(meta.screenWidth / screenImg.width, availableHeight / screenImg.height) * contentZoom;
     const drawW = screenImg.width * scale;
     const drawH = screenImg.height * scale;
-    ctx.drawImage(screenImg, meta.screenX + (meta.screenWidth - drawW) / 2, meta.screenY + topOffset, drawW, drawH);
-  } else {
-    // Fit by width, anchored beneath the browser chrome, without stretching the screenshot.
-    const drawW = meta.screenWidth * contentZoom;
-    const drawH = screenImg.height * (meta.screenWidth / screenImg.width) * contentZoom;
     ctx.drawImage(screenImg, meta.screenX + (meta.screenWidth - drawW) / 2, meta.screenY + topOffset, drawW, drawH);
   }
 

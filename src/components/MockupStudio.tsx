@@ -896,7 +896,7 @@ export function MockupStudio({ onShowToast, isActive, initialConfig }: MockupStu
             <div id="mockup-fit" className="section-label">Fit</div>
             <div role="radiogroup" aria-labelledby="mockup-fit" className="grid grid-cols-2 gap-2">
               {([
-                { label: "Fill width", desc: "Fills the screen width", value: "smart", Icon: MoveHorizontal },
+                { label: "Fill screen", desc: "Fills the whole screen", value: "smart", Icon: MoveHorizontal },
                 { label: "Whole page", desc: "Fits the full capture", value: "contain", Icon: Shrink },
               ] as const).map((option) => {
                 const active = option.value === "contain" ? fitMode === "contain" : fitMode !== "contain";

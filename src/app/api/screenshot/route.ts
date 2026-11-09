@@ -150,6 +150,7 @@ export async function POST(request: NextRequest) {
   let page: Page | null = null;
   let isRemote = false;
   let usesSharedBrowser = false;
+  let usesDefaultContext = false;
   let inFlightLaunch: Promise<Browser> | null = null;
 
   try {
@@ -358,17 +359,21 @@ export async function POST(request: NextRequest) {
         );
       }
     } else {
-      // Serverless environment (@sparticuz/chromium) without on-demand download fallback
-      const acquiring = acquireSharedBrowser("sparticuz", launchServerlessChromium);
+      // Serverless environment (@sparticuz/chromium). Launch a fresh browser per
+      // request: serverless instances freeze between invocations, so a "warm"
+      // browser kept from an earlier request is often dead or unresponsive.
+      inFlightLaunch = launchServerlessChromium().then((launched) => launched.browser);
       try {
         browser = await withTimeout(
-          () => acquiring,
+          () => inFlightLaunch!,
           launchBudget,
           "Serverless Chromium launch timed out"
         );
-        usesSharedBrowser = true;
+        inFlightLaunch = null;
+        // @sparticuz/chromium runs with --single-process, where creating extra
+        // browser contexts fails. A fresh browser is already isolated, so use its default context.
+        usesDefaultContext = true;
       } catch (serverlessErr: unknown) {
-        acquiring.then(releaseSharedBrowser).catch(() => {});
         const errMsg =
           serverlessErr instanceof Error ? serverlessErr.message : String(serverlessErr);
         logger.endStage("launch_connect");
@@ -389,8 +394,13 @@ export async function POST(request: NextRequest) {
 
     // Every capture gets its own isolated context (cookies, storage, cache),
     // both on shared remote browsers and on the warm local browser.
-    context = await browser.createBrowserContext();
-    page = await context.newPage();
+    if (usesDefaultContext) {
+      const [initialPage] = await browser.pages();
+      page = initialPage ?? (await browser.newPage());
+    } else {
+      context = await browser.createBrowserContext();
+      page = await context.newPage();
+    }
 
     await page.setViewport({
       width: deviceWidth,
@@ -739,6 +749,7 @@ export async function POST(request: NextRequest) {
         error: isTimeout
           ? "Screenshot operation timed out. The website took too long to load or capture."
           : "Screenshot generation failed. Please check the URL or try again later.",
+        stage: logger?.getActiveStage() ?? undefined,
       },
       { status: statusCode }
     );

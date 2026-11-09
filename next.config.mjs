@@ -12,7 +12,10 @@ const nextConfig = {
   serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium"],
   outputFileTracingIncludes: {
     "/api/proxy": ["./public/preview-bridge.js"],
-    "/api/screenshot": ["./node_modules/@sparticuz/chromium/bin/**"],
+    "/api/screenshot": [
+      "./node_modules/@sparticuz/chromium/bin/**",
+      "./assets/chromium-fonts/**",
+    ],
   },
 };
 

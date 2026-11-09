@@ -92,10 +92,53 @@ async function launchLocalChrome(executablePath: string): Promise<LaunchedBrowse
   }
 }
 
+/**
+ * @sparticuz/chromium only ships Open Sans, so any character outside it (arrows such as
+ * ↗, shapes such as ▹, box drawing...) renders as an empty box or nothing, and generic
+ * `monospace` / `serif` text falls back to Open Sans. Install bundled DejaVu fonts next to
+ * the package's fonts and give fontconfig proper generic-family aliases. Runs once per instance.
+ */
+const SERVERLESS_FONT_FILES = ["DejaVuSans.ttf", "DejaVuSans-Bold.ttf", "DejaVuSansMono.ttf", "DejaVuSerif.ttf"];
+const SERVERLESS_FONTS_CONF = `<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <dir>/var/task/.fonts</dir>
+  <dir>/var/task/fonts</dir>
+  <dir>/opt/fonts</dir>
+  <dir>/tmp/fonts</dir>
+  <cachedir>/tmp/fonts-cache/</cachedir>
+  <alias><family>sans-serif</family><prefer><family>Open Sans</family><family>DejaVu Sans</family></prefer></alias>
+  <alias><family>system-ui</family><prefer><family>Open Sans</family><family>DejaVu Sans</family></prefer></alias>
+  <alias><family>serif</family><prefer><family>DejaVu Serif</family></prefer></alias>
+  <alias><family>monospace</family><prefer><family>DejaVu Sans Mono</family></prefer></alias>
+</fontconfig>
+`;
+let serverlessFontsReady: Promise<void> | null = null;
+
+function installServerlessFonts(): Promise<void> {
+  serverlessFontsReady ??= (async () => {
+    const fontDir = process.env.FONTCONFIG_PATH || path.join(os.tmpdir(), "fonts");
+    const targetDir = path.join(fontDir, "instaframe");
+    const sourceDir = path.join(process.cwd(), "assets", "chromium-fonts");
+    await fs.promises.mkdir(targetDir, { recursive: true });
+    await Promise.all(
+      SERVERLESS_FONT_FILES.map((file) =>
+        fs.promises.copyFile(path.join(sourceDir, file), path.join(targetDir, file))
+      )
+    );
+    await fs.promises.writeFile(path.join(fontDir, "fonts.conf"), SERVERLESS_FONTS_CONF);
+  })().catch((err) => {
+    // Missing extra fonts only degrades symbol rendering; never block the capture.
+    console.warn("[Capture] Could not install fallback fonts:", err instanceof Error ? err.message : err);
+  });
+  return serverlessFontsReady;
+}
+
 async function launchServerlessChromium(): Promise<LaunchedBrowser> {
   const chromium = (await import("@sparticuz/chromium")).default;
   const executablePath = await chromium.executablePath();
   if (!executablePath) throw new Error("Chromium executable path is empty");
+  await installServerlessFonts();
   const browser = await puppeteer.launch({
     executablePath,
     headless: "shell",
@@ -513,6 +556,22 @@ export async function POST(request: NextRequest) {
     }
     logger.endStage("navigation");
 
+    // Diagnostic: report which WebGL backend pages get, since WebGL-drawn content
+    // (canvas backgrounds, 3D scenes) renders blank when no context is available.
+    const webglInfo = await page
+      .evaluate(() => {
+        const canvas = document.createElement("canvas");
+        const gl2 = canvas.getContext("webgl2");
+        const gl = gl2 || canvas.getContext("webgl");
+        if (!gl) return "unavailable";
+        const ext = gl.getExtension("WEBGL_debug_renderer_info");
+        const renderer = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+        gl.getExtension("WEBGL_lose_context")?.loseContext();
+        return `${gl2 ? "webgl2" : "webgl1"}; ${renderer}`;
+      })
+      .catch((err: unknown) => `error: ${err instanceof Error ? err.message : String(err)}`);
+    console.log(`[Capture] ${JSON.stringify({ requestId: logger.requestId, event: "WEBGL_INFO", backend: backendType, webgl: webglInfo })}`);
+
     // 6. Readiness Stage (Fonts, Visible Images, Animations & Settle Delay)
     logger.startStage("readiness");
     const readinessBudget = Math.min(4500, getRemainingBudget(operationStart) - 6000);
@@ -725,6 +784,8 @@ export async function POST(request: NextRequest) {
     });
 
     response.headers.set("Cache-Control", "private, no-store, no-cache, must-revalidate");
+    response.headers.set("X-Capture-Backend", backendType);
+    response.headers.set("X-Capture-WebGL", webglInfo.replace(/[^\x20-\x7e]/g, "").slice(0, 200));
     return response;
   } catch (err: unknown) {
     const errStr = err instanceof Error ? err.message : String(err);
